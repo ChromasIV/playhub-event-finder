@@ -1,0 +1,14 @@
+{
+    "auto_detect_location": true,
+    "default_latitude": 40.7128,
+    "default_longitude": -74.0060,
+    "radius_miles": 100,
+    "lorcana_keywords": [
+        "championship",
+        "championset",
+        "champion"
+    ],
+    "riftbound_keywords": [
+        "skirmish"
+    ]
+}

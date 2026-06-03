@@ -1,0 +1,46 @@
+name: Deploy Playhub Event Finder
+
+on:
+  schedule:
+    # Run every Sunday at 10:00 UTC
+    - cron: '0 10 * * 0'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Prepare configuration
+        run: |
+          if [ ! -f config.json ]; then
+            cp config.example.json config.json
+          fi
+
+      - name: Fetch events and generate index.html
+        run: python find_events.py
+
+      - name: Prepare release package
+        run: |
+          mkdir dist
+          cp index.html style.css dist/
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages

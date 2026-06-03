@@ -1,0 +1,833 @@
+import urllib.request
+import urllib.parse
+import json
+import math
+import sys
+import os
+from datetime import datetime
+
+# Default parameters
+DEFAULT_LAT = 28.2238
+DEFAULT_LON = -82.4549
+DEFAULT_RADIUS = 100
+
+def load_config():
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error reading config.json: {e}", file=sys.stderr)
+    return {}
+
+def detect_location_from_ip():
+    url = "http://ip-api.com/json"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        print("Detecting location dynamically from public IP...")
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            if data.get('status') == 'success':
+                loc = {
+                    'lat': float(data.get('lat', DEFAULT_LAT)),
+                    'lon': float(data.get('lon', DEFAULT_LON)),
+                    'city': data.get('city', "Detected Location"),
+                    'region': data.get('regionName', "")
+                }
+                print(f"Detected Location: {loc['city']}, {loc['region']} ({loc['lat']}, {loc['lon']})")
+                return loc
+    except Exception as e:
+        print(f"IP Geolocation failed: {e}. Using defaults.", file=sys.stderr)
+    return {
+        'lat': DEFAULT_LAT,
+        'lon': DEFAULT_LON,
+        'city': "Land O' Lakes",
+        'region': "Florida"
+    }
+
+def get_events(game_slug, lat, lon, radius):
+    events = []
+    page = 1
+    url = f"https://api.riftbound.uvsgames.com/api/v2/events/?latitude={lat}&longitude={lon}&num_miles={radius}&game_slug={game_slug}&upcoming_only=true&page_size=100"
+    
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    
+    print(f"Fetching {game_slug} events...")
+    while url:
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                results = data.get('results', [])
+                events.extend(results)
+                url = data.get('next')
+                page += 1
+        except Exception as e:
+            print(f"Error fetching page {page} for {game_slug}: {e}", file=sys.stderr)
+            break
+            
+    print(f"Retrieved {len(events)} total upcoming events for {game_slug}.")
+    return events
+
+def filter_and_format_events(events, game_type, keywords):
+    filtered = []
+    for item in events:
+        name = item.get('name', '')
+        desc = item.get('description', '') or ''
+        
+        # Check keywords
+        matches_keyword = False
+        for kw in keywords:
+            if kw.lower() in name.lower() or kw.lower() in desc.lower():
+                matches_keyword = True
+                break
+                
+        if not matches_keyword:
+            continue
+            
+        store = item.get('store', {}) or {}
+        store_name = store.get('name', 'Unknown Store')
+        store_address = store.get('full_address', item.get('full_address', 'Unknown Address'))
+        store_website = store.get('website')
+        store_email = store.get('email')
+        
+        start_str = item.get('start_datetime', '')
+        # Parse start date
+        date_formatted = "Unknown Date"
+        time_formatted = "Unknown Time"
+        sort_dt = datetime.max
+        if start_str:
+            try:
+                clean_str = start_str
+                if clean_str.endswith('Z'):
+                    clean_str = clean_str[:-1] + '+00:00'
+                dt = datetime.fromisoformat(clean_str)
+                sort_dt = dt
+                date_formatted = dt.strftime("%A, %B %d, %Y")
+                time_formatted = dt.strftime("%I:%M %p %Z").strip()
+            except Exception as ex:
+                pass
+                
+        event_id = item.get('id')
+        if game_type == 'Lorcana':
+            reg_url = f"https://tcg.ravensburgerplay.com/events/{event_id}"
+        else:
+            reg_url = f"https://locator.riftbound.uvsgames.com/events/{event_id}"
+            
+        cost_cents = item.get('cost_in_cents', 0)
+        cost_str = "Free" if cost_cents == 0 else f"${cost_cents / 100:.2f}"
+        
+        capacity = item.get('capacity')
+        reg_count = item.get('registered_user_count', 0)
+        spots_str = f"{reg_count} registered"
+        if capacity:
+            spots_str += f" / {capacity} max"
+            
+        dist = item.get('distance_in_miles')
+        
+        filtered.append({
+            'id': event_id,
+            'name': name,
+            'description': desc,
+            'game_type': game_type,
+            'date': date_formatted,
+            'time': time_formatted,
+            'sort_dt_iso': sort_dt.isoformat() if sort_dt != datetime.max else "",
+            'store_name': store_name,
+            'store_address': store_address,
+            'store_website': store_website,
+            'store_email': store_email,
+            'cost': cost_str,
+            'cost_cents': cost_cents,
+            'spots': spots_str,
+            'distance': dist,
+            'url': reg_url
+        })
+        
+    return filtered
+
+def generate_html_report(events, lat, lon, radius, location_name, output_file):
+    now_str = datetime.now().strftime("%B %d, %Y %I:%M %p")
+    
+    # Sort events by date initially
+    events.sort(key=lambda x: x['sort_dt_iso'])
+    
+    # JSON dump for embedding
+    events_json = json.dumps(events, indent=2)
+    
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playhub Weekly Event Matcher</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {{
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-lorcana: #eab308;
+            --accent-riftbound: #3b82f6;
+            --gradient-lorcana: linear-gradient(135deg, #f59e0b, #d97706);
+            --gradient-riftbound: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }}
+        
+        * {{
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            background: radial-gradient(circle at top right, #111827, #070a13);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            color: var(--text-color);
+        }}
+        
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }}
+        
+        header {{
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+        }}
+        
+        h1 {{
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            margin: 0 0 10px 0;
+            background: linear-gradient(to right, #ffffff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }}
+        
+        .meta-info {{
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+            font-family: 'Inter', sans-serif;
+        }}
+        
+        .meta-info strong {{
+            color: #ffffff;
+        }}
+        
+        /* Interactive Control Panel Styling */
+        .control-panel {{
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }}
+        
+        .filter-row {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: center;
+        }}
+        
+        .filter-group {{
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }}
+        
+        .filter-group label {{
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        
+        .search-input-wrapper {{
+            position: relative;
+        }}
+        
+        .search-input-wrapper input {{
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }}
+        
+        .search-input-wrapper input:focus {{
+            border-color: var(--accent-riftbound);
+        }}
+        
+        .slider-wrapper {{
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }}
+        
+        .slider-wrapper input[type="range"] {{
+            flex: 1;
+            accent-color: var(--accent-riftbound);
+            cursor: pointer;
+        }}
+        
+        .slider-value {{
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+            min-width: 70px;
+            text-align: right;
+        }}
+        
+        .toggle-group {{
+            display: flex;
+            gap: 12px;
+        }}
+        
+        .toggle-btn {{
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 18px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .toggle-btn:hover {{
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }}
+        
+        .toggle-btn.active.lorcana-toggle {{
+            background: rgba(234, 179, 8, 0.15);
+            color: var(--accent-lorcana);
+            border-color: var(--accent-lorcana);
+        }}
+        
+        .toggle-btn.active.riftbound-toggle {{
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-riftbound);
+            border-color: var(--accent-riftbound);
+        }}
+        
+        .config-help {{
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 14px;
+        }}
+        
+        /* Grid Layout */
+        .dashboard-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }}
+        
+        @media (max-width: 768px) {{
+            .dashboard-grid {{
+                grid-template-columns: 1fr;
+            }}
+        }}
+        
+        .section-title {{
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            letter-spacing: -0.02em;
+        }}
+        
+        .section-title.lorcana {{
+            color: var(--accent-lorcana);
+        }}
+        
+        .section-title.riftbound {{
+            color: var(--accent-riftbound);
+        }}
+        
+        .badge {{
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+        }}
+        
+        .badge.lorcana-bg {{
+            background: rgba(234, 179, 8, 0.15);
+            color: var(--accent-lorcana);
+            border: 1px solid rgba(234, 179, 8, 0.2);
+        }}
+        
+        .badge.riftbound-bg {{
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-riftbound);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }}
+        
+        .card-list {{
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }}
+        
+        .no-events {{
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+        }}
+        
+        .event-card {{
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }}
+        
+        .event-card::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }}
+        
+        .event-card.lorcana-card::before {{
+            background: var(--gradient-lorcana);
+        }}
+        
+        .event-card.riftbound-card::before {{
+            background: var(--gradient-riftbound);
+        }}
+        
+        .event-card:hover {{
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 20px -10px rgba(0, 0, 0, 0.5);
+            background: rgba(30, 41, 59, 0.7);
+        }}
+        
+        .event-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 16px;
+        }}
+        
+        .event-name {{
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 0;
+            color: #ffffff;
+            line-height: 1.3;
+        }}
+        
+        .event-distance {{
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }}
+        
+        .event-details {{
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
+        
+        .detail-row {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .detail-row svg {{
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }}
+        
+        .event-footer {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }}
+        
+        .event-cost {{
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }}
+        
+        .btn-register {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: opacity 0.2s;
+        }}
+        
+        .lorcana-card .btn-register {{
+            background: var(--gradient-lorcana);
+        }}
+        
+        .riftbound-card .btn-register {{
+            background: var(--gradient-riftbound);
+        }}
+        
+        .btn-register:hover {{
+            opacity: 0.9;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Playhub Weekly Match Finder</h1>
+            <div class="meta-info">
+                Report generated on <strong>{now_str}</strong><br>
+                Current Location: <strong>{location_name}</strong> ({lat}, {lon})
+            </div>
+        </header>
+        
+        <!-- Interactive client-side control panel -->
+        <div class="control-panel">
+            <div class="filter-row">
+                <!-- Real-time text search -->
+                <div class="filter-group" style="flex: 2;">
+                    <label for="search-input">Search Events</label>
+                    <div class="search-input-wrapper">
+                        <input type="text" id="search-input" placeholder="Search by name, store, or address...">
+                    </div>
+                </div>
+                
+                <!-- Client-side distance slider -->
+                <div class="filter-group">
+                    <label for="distance-slider">Distance (max {radius} mi)</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="distance-slider" min="1" max="{radius}" value="{radius}">
+                        <div class="slider-value" id="distance-display">{radius} mi</div>
+                    </div>
+                </div>
+                
+                <!-- Toggles for games -->
+                <div class="filter-group" style="flex: 0 0 auto;">
+                    <label>Toggle Games</label>
+                    <div class="toggle-group">
+                        <button id="toggle-lorcana" class="toggle-btn active lorcana-toggle">Lorcana</button>
+                        <button id="toggle-riftbound" class="toggle-btn active riftbound-toggle">Riftbound</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="config-help">
+                💡 To query a new search center, change your radius limit, or adjust keywords, edit the <code style="color: #60a5fa; background: rgba(96, 165, 250, 0.1); padding: 2px 6px; border-radius: 4px;">config.json</code> file in your project folder and run <code style="color: #34d399; background: rgba(52, 211, 153, 0.1); padding: 2px 6px; border-radius: 4px;">run_weekly.bat</code>.
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- LORCANA SECTION -->
+            <div id="lorcana-section">
+                <div class="section-title lorcana">
+                    <span>Disney Lorcana Championships</span>
+                    <span class="badge lorcana-bg" id="lorcana-count">0 Found</span>
+                </div>
+                <div class="card-list" id="lorcana-container">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- RIFTBOUND SECTION -->
+            <div id="riftbound-section">
+                <div class="section-title riftbound">
+                    <span>Riftbound Skirmishes</span>
+                    <span class="badge riftbound-bg" id="riftbound-count">0 Found</span>
+                </div>
+                <div class="card-list" id="riftbound-container">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embedded pre-baked JSON data -->
+    <script>
+        const ALL_EVENTS = {events_json};
+        
+        let showLorcana = true;
+        let showRiftbound = true;
+        let maxDistance = {radius};
+        let searchQuery = "";
+        
+        const searchInput = document.getElementById("search-input");
+        const distanceSlider = document.getElementById("distance-slider");
+        const distanceDisplay = document.getElementById("distance-display");
+        const toggleLorcanaBtn = document.getElementById("toggle-lorcana");
+        const toggleRiftboundBtn = document.getElementById("toggle-riftbound");
+        
+        const lorcanaContainer = document.getElementById("lorcana-container");
+        const riftboundContainer = document.getElementById("riftbound-container");
+        const lorcanaCount = document.getElementById("lorcana-count");
+        const riftboundCount = document.getElementById("riftbound-count");
+        
+        const lorcanaSection = document.getElementById("lorcana-section");
+        const riftboundSection = document.getElementById("riftbound-section");
+        
+        // Render events client-side based on active filters
+        function renderEvents() {{
+            // Filter elements
+            const filtered = ALL_EVENTS.filter(ev => {{
+                // Game toggle
+                if (ev.game_type === "Lorcana" && !showLorcana) return false;
+                if (ev.game_type === "Riftbound" && !showRiftbound) return false;
+                
+                // Distance check
+                if (ev.distance > maxDistance) return false;
+                
+                // Search query check
+                if (searchQuery) {{
+                    const q = searchQuery.toLowerCase();
+                    const nameMatch = ev.name.toLowerCase().includes(q);
+                    const storeMatch = ev.store_name.toLowerCase().includes(q);
+                    const addressMatch = ev.store_address.toLowerCase().includes(q);
+                    const descMatch = (ev.description || "").toLowerCase().includes(q);
+                    if (!nameMatch && !storeMatch && !addressMatch && !descMatch) return false;
+                }}
+                
+                return true;
+            }});
+            
+            // Separate lists
+            const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana");
+            const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound");
+            
+            // Show/Hide section column if game toggle is unchecked
+            lorcanaSection.style.display = showLorcana ? "block" : "none";
+            riftboundSection.style.display = showRiftbound ? "block" : "none";
+            
+            // Update badges
+            lorcanaCount.textContent = `${{lorcanaList.length}} Found`;
+            riftboundCount.textContent = `${{riftboundList.length}} Found`;
+            
+            // Render Lorcana
+            lorcanaContainer.innerHTML = lorcanaList.length === 0 
+                ? `<div class="no-events">No matching Lorcana events.</div>`
+                : lorcanaList.map(ev => generateEventCard(ev, "lorcana")).join("");
+                
+            // Render Riftbound
+            riftboundContainer.innerHTML = riftboundList.length === 0 
+                ? `<div class="no-events">No matching Riftbound skirmishes.</div>`
+                : riftboundList.map(ev => generateEventCard(ev, "riftbound")).join("");
+        }}
+        
+        function generateEventCard(ev, styleClass) {{
+            return `
+                <div class="event-card ${{styleClass}}-card">
+                    <div>
+                        <div class="event-header">
+                            <h3 class="event-name">${{ev.name}}</h3>
+                            <span class="event-distance">${{ev.distance.toFixed(1)}} mi</span>
+                        </div>
+                        <div class="event-details">
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span>${{ev.date}}</span>
+                            </div>
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                <span>${{ev.time}}</span>
+                            </div>
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                <span>${{ev.store_name}} (${{ev.store_address}})</span>
+                            </div>
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                <span>${{ev.spots}}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="event-footer">
+                        <span class="event-cost">${{ev.cost}}</span>
+                        <a href="${{ev.url}}" target="_blank" class="btn-register">
+                            View Details
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </a>
+                    </div>
+                </div>
+            `;
+        }}
+        
+        // Listeners
+        searchInput.addEventListener("input", (e) => {{
+            searchQuery = e.target.value;
+            renderEvents();
+        }});
+        
+        distanceSlider.addEventListener("input", (e) => {{
+            maxDistance = Number(e.target.value);
+            distanceDisplay.textContent = `${{maxDistance}} mi`;
+            renderEvents();
+        }});
+        
+        toggleLorcanaBtn.addEventListener("click", () => {{
+            showLorcana = !showLorcana;
+            toggleLorcanaBtn.classList.toggle("active", showLorcana);
+            renderEvents();
+        }});
+        
+        toggleRiftboundBtn.addEventListener("click", () => {{
+            showRiftbound = !showRiftbound;
+            toggleRiftboundBtn.classList.toggle("active", showRiftbound);
+            renderEvents();
+        }});
+        
+        // Initial load
+        renderEvents();
+    </script>
+</body>
+</html>
+"""
+    
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print(f"HTML report successfully generated at: {output_file}")
+
+def main():
+    # Load configuration
+    config = load_config()
+    
+    auto_detect = config.get("auto_detect_location", True)
+    default_lat = config.get("default_latitude", DEFAULT_LAT)
+    default_lon = config.get("default_longitude", DEFAULT_LON)
+    radius = config.get("radius_miles", DEFAULT_RADIUS)
+    
+    lorcana_keywords = config.get("lorcana_keywords", ["championship", "championset", "champion"])
+    riftbound_keywords = config.get("riftbound_keywords", ["skirmish"])
+    
+    # 1. Geolocation detection
+    # Skip dynamic IP location detection under GitHub Actions to avoid geolocating the runner's server center.
+    if auto_detect and "GITHUB_ACTIONS" not in os.environ:
+        loc = detect_location_from_ip()
+        lat = loc['lat']
+        lon = loc['lon']
+        location_name = f"{loc['city']}, {loc['region']}"
+    else:
+        lat = default_lat
+        lon = default_lon
+        location_name = "Configured Location"
+        
+    # Optional arguments parser overrides
+    if len(sys.argv) >= 3:
+        try:
+            lat = float(sys.argv[1])
+            lon = float(sys.argv[2])
+            location_name = "Command Line Arguments"
+            if len(sys.argv) >= 4:
+                radius = int(sys.argv[3])
+        except:
+            print("Invalid arguments. Usage: python find_events.py [latitude] [longitude] [radius_miles]")
+            sys.exit(1)
+            
+    print(f"Searching events within {radius} miles of coordinates ({lat}, {lon}) ({location_name})")
+    
+    # 2. Fetch upcoming Disney Lorcana events (game=1)
+    lorcana_raw = get_events("disney-lorcana", lat, lon, radius)
+    lorcana_matches = filter_and_format_events(lorcana_raw, "Lorcana", lorcana_keywords)
+    
+    # 3. Fetch upcoming Riftbound events (game=3)
+    riftbound_raw = get_events("riftbound", lat, lon, radius)
+    riftbound_matches = filter_and_format_events(riftbound_raw, "Riftbound", riftbound_keywords)
+    
+    all_matches = lorcana_matches + riftbound_matches
+    
+    print("\n" + "="*50)
+    print(f"FOUND {len(lorcana_matches)} LORCANA CHAMPIONSHIPS:")
+    print("="*50)
+    for idx, ev in enumerate(lorcana_matches, 1):
+        print(f"{idx}. {ev['name']}")
+        print(f"   Date: {ev['date']} at {ev['time']}")
+        print(f"   Store: {ev['store_name']} ({ev['distance']:.1f} miles away)")
+        print(f"   Spots: {ev['spots']} | Cost: {ev['cost']}")
+        print("-" * 50)
+        
+    print("\n" + "="*50)
+    print(f"FOUND {len(riftbound_matches)} RIFTBOUND SKIRMISHES:")
+    print("="*50)
+    for idx, ev in enumerate(riftbound_matches, 1):
+        print(f"{idx}. {ev['name']}")
+        print(f"   Date: {ev['date']} at {ev['time']}")
+        print(f"   Store: {ev['store_name']} ({ev['distance']:.1f} miles away)")
+        print(f"   Spots: {ev['spots']} | Cost: {ev['cost']}")
+        print("-" * 50)
+        
+    # Generate HTML report in the same directory as the script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_html = os.path.join(script_dir, "index.html")
+    generate_html_report(all_matches, lat, lon, radius, location_name, output_html)
+
+if __name__ == "__main__":
+    main()
