@@ -3,7 +3,7 @@
 A zero-dependency, automated competitive card game event finder. It fetches, filters, and generates a visual dashboard of upcoming **Disney Lorcana Store Championships** and **Riftbound Summoner Skirmishes** within a specified radius of your location.
 
 ## Theme Version
-Theme Version: 1.0.8
+Theme Version: 1.0.9
 
 ---
 
@@ -52,16 +52,18 @@ Open `config.json` in your favorite text editor to configure settings:
 ```json
 {
     "auto_detect_location": true,
-    "default_latitude": 28.2238,
-    "default_longitude": -82.4549,
+    "default_latitude": 27.9506,
+    "default_longitude": -82.4572,
     "radius_miles": 100,
+    "global_mode": false,
     "lorcana_keywords": ["championship", "championset", "champion"],
     "riftbound_keywords": ["skirmish"]
 }
 ```
 *   `auto_detect_location`: If `true`, the script queries `http://ip-api.com` on startup to detect your IP's current coordinates.
-*   `default_latitude` / `default_longitude`: Used as fallbacks if IP detection fails, or as manual overrides if `auto_detect_location` is `false`.
+*   `default_latitude` / `default_longitude`: Used as fallbacks if IP detection fails, or as manual overrides if `auto_detect_location` is `false`. Defaults to Tampa, FL.
 *   `radius_miles`: Search radius limit (in miles).
+*   `global_mode`: If `true` (or when running inside GitHub Actions), the script pulls all upcoming matching events globally, enabling the client-side location search on the website to find events from any address.
 *   `lorcana_keywords` / `riftbound_keywords`: Specific keywords to filter for in event names/descriptions.
 
 ## How to Run
