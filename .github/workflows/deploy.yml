@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies for testing
         run: |
           pip install playwright
-          playwright install chromium
+          playwright install --with-deps chromium
 
       - name: Run Unit Tests
         run: python test_events.py
