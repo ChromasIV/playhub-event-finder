@@ -820,9 +820,17 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 return true;
             }});
             
-            // Separate lists and sort by distance
-            const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana").sort((a, b) => a.distance - b.distance);
-            const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound").sort((a, b) => a.distance - b.distance);
+            // Separate lists and sort by date ASC (earliest first)
+            const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana").sort((a, b) => {{
+                if (!a.sort_dt_iso) return 1;
+                if (!b.sort_dt_iso) return -1;
+                return a.sort_dt_iso.localeCompare(b.sort_dt_iso);
+            }});
+            const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound").sort((a, b) => {{
+                if (!a.sort_dt_iso) return 1;
+                if (!b.sort_dt_iso) return -1;
+                return a.sort_dt_iso.localeCompare(b.sort_dt_iso);
+            }});
             
             // Show/Hide section column if game toggle is unchecked
             lorcanaSection.style.display = showLorcana ? "block" : "none";
