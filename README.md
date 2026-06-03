@@ -3,7 +3,7 @@
 A zero-dependency, automated competitive card game event finder. It fetches, filters, and generates a visual dashboard of upcoming **Disney Lorcana Store Championships** and **Riftbound Summoner Skirmishes** within a specified radius of your location.
 
 ## Theme Version
-Theme Version: 1.0.7
+Theme Version: 1.0.8
 
 ---
 
@@ -129,6 +129,13 @@ If you would like to host the interactive report on **GitHub Pages** so that it 
    - Select the `gh-pages` branch and the `/ (root)` folder, then click **Save**.
 
 The page will now be hosted publicly, and the GitHub Actions cron schedule will automatically rebuild and update it every Sunday at 10:00 AM UTC.
+
+## Running Unit Tests
+
+We use Python's built-in `unittest` library to verify distance calculations, keyword filtering, and config parsing. Run the tests using:
+```bash
+python test_events.py
+```
 
 ## License
 Licensed under the [MIT License](LICENSE).
