@@ -3,7 +3,7 @@
 A zero-dependency, automated competitive card game event finder. It fetches, filters, and generates a visual dashboard of upcoming **Disney Lorcana Store Championships** and **Riftbound Summoner Skirmishes** within a specified radius of your location.
 
 ## Theme Version
-Theme Version: 1.0.9
+Theme Version: 1.1.0
 
 ---
 
@@ -11,10 +11,12 @@ Theme Version: 1.0.9
 *   **Zero Dependencies:** Built entirely using Python's standard libraries—no `pip install` required.
 *   **Dual Game Support:** Pulls Lorcana and Riftbound events directly from active Playhub endpoints.
 *   **Automatic IP Geolocation:** Detects your public IP coordinates dynamically at runtime to calculate proximity (with manual overrides).
-*   **Rich HTML Web Dashboard:** Compiles matches into a dark-mode, mobile-friendly interactive dashboard (`events_report.html`) complete with:
-    *   Real-time search filtering.
-    *   Distance radius slider.
-    *   Game section show/hide toggles.
+*   **Rich HTML Web Dashboard:** Compiles matches into a dark-mode, mobile-friendly interactive dashboard (`index.html`) complete with:
+    *   **Interactive Location Locator**: Search matches from any address or zip code (using OpenStreetMap Nominatim geocoding).
+    *   **Distance Radius Slider**: Filter matches up to 500 miles away.
+    *   **Date Range Filter**: Filter events within the next 7, 14, 30, or 60 days.
+    *   **Real-time Text Search**: Instant filtering by name, store, or address.
+    *   **Game Toggle Buttons**: Quick show/hide controls for Disney Lorcana vs. Riftbound.
     *   Registration links, fees, and seating capacity info.
 *   **Background Automation:** Includes built-in scheduling helpers to update the reports weekly.
 
@@ -80,13 +82,13 @@ python find_events.py 28.2238 -82.4549 150
 Once the script completes, open the generated report in your default web browser:
 ```bash
 # On Windows
-start events_report.html
+start index.html
 
 # On macOS
-open events_report.html
+open index.html
 
 # On Linux
-xdg-open events_report.html
+xdg-open index.html
 ```
 
 ---
@@ -101,7 +103,7 @@ We provide an automated PowerShell setup script. Open a PowerShell window as **A
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\schedule_task.ps1
 ```
-This registers a Scheduled Task named `PlayhubEventFinder` that runs `run_weekly.bat` every **Sunday at 10:00 AM** in the background, writing updates silently to `events_report.html`.
+This registers a Scheduled Task named `PlayhubEventFinder` that runs `run_weekly.bat` every **Sunday at 10:00 AM** in the background, writing updates silently to `index.html`.
 
 ### On macOS / Linux
 You can register a `cron` job. Open your crontab manager:

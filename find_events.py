@@ -634,6 +634,18 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                         <div class="slider-value" id="distance-display">{radius} mi</div>
                     </div>
                 </div>
+
+                <!-- Client-side date filter -->
+                <div class="filter-group" style="flex: 1; min-width: 200px;">
+                    <label for="date-filter">Date Range</label>
+                    <select id="date-filter" style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 0.95rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-riftbound)'" onblur="this.style.borderColor='var(--border-color)'">
+                        <option value="all">All Upcoming Dates</option>
+                        <option value="7">Next 7 Days</option>
+                        <option value="14">Next 14 Days</option>
+                        <option value="30">Next 30 Days</option>
+                        <option value="60">Next 60 Days</option>
+                    </select>
+                </div>
                 
                 <!-- Toggles for games -->
                 <div class="filter-group" style="flex: 0 0 auto;">
@@ -685,10 +697,12 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         let searchQuery = "";
         let currentLat = {lat};
         let currentLon = {lon};
+        let maxDays = "all";
         
         const searchInput = document.getElementById("search-input");
         const distanceSlider = document.getElementById("distance-slider");
         const distanceDisplay = document.getElementById("distance-display");
+        const dateFilter = document.getElementById("date-filter");
         const toggleLorcanaBtn = document.getElementById("toggle-lorcana");
         const toggleRiftboundBtn = document.getElementById("toggle-riftbound");
         
@@ -767,6 +781,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         // Render events client-side based on active filters
         function renderEvents() {{
             // Filter elements
+            const now = new Date();
             const filtered = ALL_EVENTS.filter(ev => {{
                 // Game toggle
                 if (ev.game_type === "Lorcana" && !showLorcana) return false;
@@ -774,6 +789,14 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 
                 // Distance check
                 if (ev.distance > maxDistance) return false;
+                
+                // Date range check
+                if (maxDays !== "all" && ev.sort_dt_iso) {{
+                    const eventDate = new Date(ev.sort_dt_iso);
+                    const diffTime = eventDate - now;
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    if (diffDays > parseInt(maxDays)) return false;
+                }}
                 
                 // Search query check
                 if (searchQuery) {{
@@ -859,6 +882,11 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         distanceSlider.addEventListener("input", (e) => {{
             maxDistance = Number(e.target.value);
             distanceDisplay.textContent = `${{maxDistance}} mi`;
+            renderEvents();
+        }});
+        
+        dateFilter.addEventListener("change", (e) => {{
+            maxDays = e.target.value;
             renderEvents();
         }});
         
