@@ -24,7 +24,7 @@ async def run_test():
             status=200,
             content_type="application/json",
             body='[{"lat":"27.9506","lon":"-82.4572","display_name":"Tampa, FL, USA"}]' if "Tampa" in route.request.url else
-                 '[{"lat":"47.6062","lon":"-122.3321","display_name":"Seattle, WA, USA"}]'
+                 '[{"lat":"0.0","lon":"0.0","display_name":"Seattle, WA, USA"}]'
         ))
         
         await page.goto(file_url)
