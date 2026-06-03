@@ -15,6 +15,14 @@ async def run_test():
         file_url = f"file:///{html_path.replace(os.sep, '/')}"
         print(f"Loading page: {file_url}")
         
+        # Intercept and mock Nominatim geocoding requests to avoid live network rate-limits in CI environment
+        await page.route("**/nominatim.openstreetmap.org/search*", lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"lat":"27.9506","lon":"-82.4572","display_name":"Tampa, FL, USA"}]' if "Tampa" in route.request.url else
+                 '[{"lat":"47.6062","lon":"-122.3321","display_name":"Seattle, WA, USA"}]'
+        ))
+        
         await page.goto(file_url)
         
         # Verify page title
