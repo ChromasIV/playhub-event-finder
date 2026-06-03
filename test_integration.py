@@ -1,18 +1,22 @@
 import os
 import sys
 import asyncio
+from pathlib import Path
 from playwright.async_api import async_playwright
 
 async def run_test():
     async with async_playwright() as p:
-        # Launch browser headlessly
+        # Launch browser headlessly with web security disabled to allow local file:// pages to fetch mocked APIs
         print("Launching headless Chromium...")
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(headless=True, args=["--disable-web-security"])
         page = await browser.new_page()
         
-        # Get absolute path of index.html
-        html_path = os.path.abspath("index.html")
-        file_url = f"file:///{html_path.replace(os.sep, '/')}"
+        # Capture browser console outputs and uncaught errors to standard output/error for CI diagnostics
+        page.on("console", lambda msg: print(f"BROWSER CONSOLE: [{msg.type}] {msg.text}"))
+        page.on("pageerror", lambda err: print(f"BROWSER ERROR: {err}", file=sys.stderr))
+        
+        # Get absolute URI of index.html cross-platform
+        file_url = Path(os.path.abspath("index.html")).as_uri()
         print(f"Loading page: {file_url}")
         
         # Intercept and mock Nominatim geocoding requests to avoid live network rate-limits in CI environment
