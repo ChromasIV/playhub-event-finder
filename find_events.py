@@ -77,12 +77,13 @@ def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
     page = 1
     
     if lat is not None and lon is not None and radius is not None:
-        url = f"https://api.riftbound.uvsgames.com/api/v2/events/?latitude={lat}&longitude={lon}&num_miles={radius}&game_slug={game_slug}&upcoming_only=true&page_size=100"
+        base_url = f"https://api.riftbound.uvsgames.com/api/v2/events/?latitude={lat}&longitude={lon}&num_miles={radius}&game_slug={game_slug}&upcoming_only=true&page_size=100"
     else:
-        url = f"https://api.riftbound.uvsgames.com/api/v2/events/?game_slug={game_slug}&upcoming_only=true&page_size=100"
+        base_url = f"https://api.riftbound.uvsgames.com/api/v2/events/?game_slug={game_slug}&upcoming_only=true&page_size=100"
         if keyword:
-            url += f"&name={urllib.parse.quote(keyword)}"
+            base_url += f"&name={urllib.parse.quote(keyword)}"
             
+    url = base_url
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
     print(f"Fetching {game_slug} events (URL: {url})...")
@@ -95,7 +96,16 @@ def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
                 data = json.loads(response.read().decode('utf-8'))
                 results = data.get('results', [])
                 events.extend(results)
-                url = data.get('next')
+                
+                next_val = data.get('next')
+                if next_val:
+                    next_str = str(next_val)
+                    if next_str.startswith('http'):
+                        url = next_str
+                    else:
+                        url = f"{base_url}&page={next_str}"
+                else:
+                    url = None
                 page += 1
         except Exception as e:
             print(f"Error fetching page {page} for {game_slug}: {e}", file=sys.stderr)
