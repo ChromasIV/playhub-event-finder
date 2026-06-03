@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playhub Weekly Event Matcher</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-lorcana: #eab308;
+            --accent-riftbound: #3b82f6;
+            --gradient-lorcana: linear-gradient(135deg, #f59e0b, #d97706);
+            --gradient-riftbound: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: radial-gradient(circle at top right, #111827, #070a13);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            margin: 0 0 10px 0;
+            background: linear-gradient(to right, #ffffff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .meta-info {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .meta-info strong {
+            color: #ffffff;
+        }
+        
+        /* Interactive Control Panel Styling */
+        .control-panel {
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-group label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .search-input-wrapper {
+            position: relative;
+        }
+        
+        .search-input-wrapper input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input-wrapper input:focus {
+            border-color: var(--accent-riftbound);
+        }
+        
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .slider-wrapper input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent-riftbound);
+            cursor: pointer;
+        }
+        
+        .slider-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+            min-width: 70px;
+            text-align: right;
+        }
+        
+        .toggle-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 18px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+        
+        .toggle-btn.active.lorcana-toggle {
+            background: rgba(234, 179, 8, 0.15);
+            color: var(--accent-lorcana);
+            border-color: var(--accent-lorcana);
+        }
+        
+        .toggle-btn.active.riftbound-toggle {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-riftbound);
+            border-color: var(--accent-riftbound);
+        }
+        
+        .config-help {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 14px;
+        }
+        
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            letter-spacing: -0.02em;
+        }
+        
+        .section-title.lorcana {
+            color: var(--accent-lorcana);
+        }
+        
+        .section-title.riftbound {
+            color: var(--accent-riftbound);
+        }
+        
+        .badge {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .badge.lorcana-bg {
+            background: rgba(234, 179, 8, 0.15);
+            color: var(--accent-lorcana);
+            border: 1px solid rgba(234, 179, 8, 0.2);
+        }
+        
+        .badge.riftbound-bg {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-riftbound);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .no-events {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .event-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .event-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+        
+        .event-card.lorcana-card::before {
+            background: var(--gradient-lorcana);
+        }
+        
+        .event-card.riftbound-card::before {
+            background: var(--gradient-riftbound);
+        }
+        
+        .event-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 20px -10px rgba(0, 0, 0, 0.5);
+            background: rgba(30, 41, 59, 0.7);
+        }
+        
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 16px;
+        }
+        
+        .event-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 0;
+            color: #ffffff;
+            line-height: 1.3;
+        }
+        
+        .event-distance {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        
+        .event-details {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .detail-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .detail-row svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+        
+        .event-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        
+        .event-cost {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .btn-register {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: opacity 0.2s;
+        }
+        
+        .lorcana-card .btn-register {
+            background: var(--gradient-lorcana);
+        }
+        
+        .riftbound-card .btn-register {
+            background: var(--gradient-riftbound);
+        }
+        
+        .btn-register:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Playhub Weekly Match Finder</h1>
+            <div class="meta-info">
+                Report generated on <strong>June 03, 2026 06:20 PM</strong><br>
+                Current Location: <strong>Configured Location</strong> (40.7128, -74.006)
+            </div>
+        </header>
+        
+        <!-- Interactive client-side control panel -->
+        <div class="control-panel">
+            <div class="filter-row">
+                <!-- Real-time text search -->
+                <div class="filter-group" style="flex: 2;">
+                    <label for="search-input">Search Events</label>
+                    <div class="search-input-wrapper">
+                        <input type="text" id="search-input" placeholder="Search by name, store, or address...">
+                    </div>
+                </div>
+                
+                <!-- Client-side distance slider -->
+                <div class="filter-group">
+                    <label for="distance-slider">Distance (max 100 mi)</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="distance-slider" min="1" max="100" value="100">
+                        <div class="slider-value" id="distance-display">100 mi</div>
+                    </div>
+                </div>
+                
+                <!-- Toggles for games -->
+                <div class="filter-group" style="flex: 0 0 auto;">
+                    <label>Toggle Games</label>
+                    <div class="toggle-group">
+                        <button id="toggle-lorcana" class="toggle-btn active lorcana-toggle">Lorcana</button>
+                        <button id="toggle-riftbound" class="toggle-btn active riftbound-toggle">Riftbound</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="config-help">
+                💡 To query a new search center, change your radius limit, or adjust keywords, edit the <code style="color: #60a5fa; background: rgba(96, 165, 250, 0.1); padding: 2px 6px; border-radius: 4px;">config.json</code> file in your project folder and run <code style="color: #34d399; background: rgba(52, 211, 153, 0.1); padding: 2px 6px; border-radius: 4px;">run_weekly.bat</code>.
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- LORCANA SECTION -->
+            <div id="lorcana-section">
+                <div class="section-title lorcana">
+                    <span>Disney Lorcana Championships</span>
+                    <span class="badge lorcana-bg" id="lorcana-count">0 Found</span>
+                </div>
+                <div class="card-list" id="lorcana-container">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- RIFTBOUND SECTION -->
+            <div id="riftbound-section">
+                <div class="section-title riftbound">
+                    <span>Riftbound Skirmishes</span>
+                    <span class="badge riftbound-bg" id="riftbound-count">0 Found</span>
+                </div>
+                <div class="card-list" id="riftbound-container">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embedded pre-baked JSON data -->
+    <script>
+        const ALL_EVENTS = [
+  {
+    "id": 349572,
+    "name": "Wednesday Evening Summoner Skirmish - June",
+    "description": "**NOTE:** Registration is \"**First come, first serve the day of, we do NOT follow the registration list**\"\n\nFormat: 1v1 Constructed, Best of 3 Matches, Swiss\n\nEntry: $15 dollars, 1 Riftbound pack upon entry and promo(s).\n\nEvent Structure: 50 min Swiss Rounds with Top Cut (4 or 8 single elimination, depending on attendance)(Capacity: 32 players with 1 promo upon entry)\n\nOrganized Play Level: **Competitive**\n\nPrizing: Winner Playmat & Round 1 Bye at a Regional Qualifier for 1st place, top 8 promos for top 8 finishers. **2** Riftbound Packs into prize pool per player. Top 4 payout if 12 player or less, top 8 payout if 13 players or more.",
+    "game_type": "Riftbound",
+    "date": "Wednesday, June 03, 2026",
+    "time": "10:00 PM UTC",
+    "sort_dt_iso": "2026-06-03T22:00:00+00:00",
+    "store_name": "Next Level",
+    "store_address": "874 4th Avenue, Brooklyn, NY, 11232, US",
+    "store_website": null,
+    "store_email": "nycnextlevel@gmail.com",
+    "cost": "$15.00",
+    "cost_cents": 1500,
+    "spots": "27 registered / 32 max",
+    "distance": 3.8646420835820408,
+    "url": "https://locator.riftbound.uvsgames.com/events/349572"
+  },
+  {
+    "id": 348230,
+    "name": "Friday Afternoon Summoner Skirmish - June",
+    "description": "",
+    "game_type": "Riftbound",
+    "date": "Friday, June 05, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-05T16:00:00+00:00",
+    "store_name": "Royal Sports & Entertainment",
+    "store_address": "96-11 Metropolitan Avenue, Forest Hills, NY, 11375, US",
+    "store_website": null,
+    "store_email": "royalsportsnyc@gmail.com",
+    "cost": "$10.00",
+    "cost_cents": 1000,
+    "spots": "32 registered / 32 max",
+    "distance": 7.858262362155013,
+    "url": "https://locator.riftbound.uvsgames.com/events/348230"
+  },
+  {
+    "id": 531126,
+    "name": "Disney Lorcana - Wilds Unknown Set Championship | Round 2 Gaming",
+    "description": "Put your deckbuilding skills to the test at Round 2 Gaming's Wilds Unknown Set Championship!\n\n**ENTRY FEE**\n$20\n\n**FORMAT**\nCore Constructed\n\n**STRUCTURE**\nA number of Swiss Rounds dependent on number of players and then a Top 8 Cut\n\n- Swiss Rounds: 55 minutes\n- Top Cut Rounds (Top 8 and Top 4): Core 70 minutes\n- Untimed Final Round\n\n**PRIZING**\n$10 store credit into a pot per player.\nSample payout for 32 participants:\n\n- 1st - $70 store credit, Champion playmat, foil promo card, nonfoil promo card\n- 2nd - $60 store credit, Foil promo card, nonfoil promo card\n- 3rd - $55 store credit, Foil promo card, nonfoil promo card\n- 4th - $45 store credit, Foil promo card, nonfoil promo card\n- 5th - $35 store credit, Foil promo card, nonfoil promo card\n- 6th - $25 store credit, Foil promo card, nonfoil promo card\n- 7th - $20 store credit, Foil promo card, nonfoil promo card\n- 8th - $10 store credit, Foil promo card, nonfoil promo card\n- 9th-32nd - Nonfoil promo card\n\nPrizes can be adjusted based on number of participating players.\nDecklists are required! Please either bring one in, come in early to make one, or email sales@round2gaming.com with \"Lorcana Decklist - [Your Name]\" as subject.\n\n**REGISTRATION**\nIn store, by phone or online (https://round2gaming.com/store/Events-c181380121)\n\n**Round 2 Gaming**\nQuaker Bridge Mall\n3320 US Highway 1 Unit 256\nLawrence, NJ 08648\n609-749-6000\nsales@round2gaming.com",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 06, 2026",
+    "time": "03:30 PM UTC",
+    "sort_dt_iso": "2026-06-06T15:30:00+00:00",
+    "store_name": "Round 2 Gaming",
+    "store_address": "3320 U.S. 1, Quakerbridge Mall - Unit 256, Lawrence, NJ, 08648, US",
+    "store_website": "https://round2gaming.com/",
+    "store_email": "sales@round2gaming.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "14 registered / 32 max",
+    "distance": 45.86426639171591,
+    "url": "https://tcg.ravensburgerplay.com/events/531126"
+  },
+  {
+    "id": 534761,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 06, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-06T17:00:00+00:00",
+    "store_name": "ZCGames",
+    "store_address": "65 Dolson Avenue, Middletown, NY, 10940, US",
+    "store_website": "https://zcgamestcg.com",
+    "store_email": "zcgames2019@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "6 registered / 16 max",
+    "distance": 54.3451214736527,
+    "url": "https://tcg.ravensburgerplay.com/events/534761"
+  },
+  {
+    "id": 647307,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "$10 per person payable in person on the day of the event.\nCheck In<<<\nPlease check in between 12pm and 1pm on the day of the event. We will begin pairings right at 1pm.\nFormat and Deck Lists<<<\nThis tournament is in the Constructed (Core) format.\nThis is a Swiss-style tournament. Each round is 60-minutes in length. Each round is played in the Best-of-3 Format. The number of rounds in the tournament will be dependent on the number of attendees. Playoff rounds will be played after the Swiss rounds including players with the highest standings. The playoffs are single-elimination rounds until one undefeated player is remaining as the tournament champion. Playoff rounds will be played in a \u201cBest-of 3\u201d match up. Number of rounds and top cut depends on total attendance:\n8 players: 3 rounds, no cut\n9-16 players: 4 rounds, cut to top 4\n17+ players: 5 rounds, cut to top 8\nPrizing<<<\n1st place: Wild Unknown Champion playmat, Alt Art Foil Card\n2nd \u2013 8th places: Alt Art Foil Card\nAll players will receive an Alt Art Non-Foil card. In addition to the official prizing, booster packs or product equivalent to entry fees will be included in the prize pool for each registered player in the event and distributed amongst all players. Additional prizing and promos may be added on and announced on the day of the event.",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 06, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-06T17:00:00+00:00",
+    "store_name": "Brothers Grim Games",
+    "store_address": "1244 Middle Country Road, Selden, NY, 11784, US",
+    "store_website": "https://www.facebook.com/BrothersGrimGames",
+    "store_email": "BrothersGrimGames@gmail.com",
+    "cost": "$10.00",
+    "cost_cents": 1000,
+    "spots": "0 registered / 24 max",
+    "distance": 50.7359597924124,
+    "url": "https://tcg.ravensburgerplay.com/events/647307"
+  },
+  {
+    "id": 605387,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "$10/pp. Pack per swiss round win. 0-X still gets a pack. \n\nPreregistration available @ https://ichooseyou.cards",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 06, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-06T17:00:00+00:00",
+    "store_name": "ichooseyou TCGs",
+    "store_address": "5 Lenape Road, Andover, NJ, 7821, US",
+    "store_website": "https://ichooseyou.cards/",
+    "store_email": "support@ichooseyou.cards",
+    "cost": "$10.00",
+    "cost_cents": 1000,
+    "spots": "0 registered / 16 max",
+    "distance": 42.89685448448557,
+    "url": "https://tcg.ravensburgerplay.com/events/605387"
+  },
+  {
+    "id": 625893,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "Start Time: 3:30pm (we start sharp!)\nEntry: $30\nFormat: Constructed\n\nThis event is capped at 20 players, so preregistration is strongly encouraged. THE ONLY WAY TO PREREGISTER FOR THIS EVENT IS IN PERSON OR OVER THE PHONE. REGISTERING IN THE APP WILL NOT BE USED FOR PREREGISTRATION.\n\nRegistration for this event opens at Noon on Monday, June 1st. Players can register in-store or over the phone at 856-442-0402. Payment is due at the time of registration.\n\nPrizes:\n1st Place- Champion Playmat\n\nAll players who finish in the top 8 receive an exclusive promo!\n\nOther store credit prizes are based on attendance\n\nQuestions? Give us a call at 856-442-0402.",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 06, 2026",
+    "time": "07:30 PM UTC",
+    "sort_dt_iso": "2026-06-06T19:30:00+00:00",
+    "store_name": "The Comic Book Store",
+    "store_address": "30 North Main Street, Glassboro, NJ, 8028, US",
+    "store_website": "https://thecomicbookstore.website/",
+    "store_email": "thecomicbookstore@gmail.com",
+    "cost": "$30.00",
+    "cost_cents": 3000,
+    "spots": "1 registered / 20 max",
+    "distance": 90.91985015285961,
+    "url": "https://tcg.ravensburgerplay.com/events/625893"
+  },
+  {
+    "id": 547743,
+    "name": "Wilds Unknown Set Championship",
+    "description": "Entry: $35\n\nRegistration: 9:30 AM\nEvent StartL 10:00 AM\n\nAll Players will receive:\n\nWoody Non-Foil Promo\nOne Pack of Wilds Unknown\nOne Raffle Ticket\n\nLunch will be provided for all in attendance.\n\nPrizes Support as Followed:\n\n1st Place -  Wilds Unknown Trophy - Championship Playmat - 1 Box of Wild's  Unknown- Foil Woody Promo Card\n2nd Place - Custom PDK Nine Playmat - 1 Box of Wilds Unknown - Foil Woody Promo\n3rd/4th Place - 1 Box of Wilds Unknown- Foil Woody Promo\n5th to 8th Place - 12 Packs of Wild's Unknown - Foil Woody Promo\n9th to 16th Place - Wild's Unknown Pre-release Kit\n\nAdditional raffle prizes included a box of wilds unknown, oversized lorcana cards and more!",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 07, 2026",
+    "time": "02:00 PM UTC",
+    "sort_dt_iso": "2026-06-07T14:00:00+00:00",
+    "store_name": "pdk NINE",
+    "store_address": "127 Ark Road, Unit 4, Mt Laurel, NJ, 08054, US",
+    "store_website": null,
+    "store_email": "nine.pdk@gmail.com",
+    "cost": "$35.00",
+    "cost_cents": 3500,
+    "spots": "39 registered / 48 max",
+    "distance": 68.51265094831378,
+    "url": "https://tcg.ravensburgerplay.com/events/547743"
+  },
+  {
+    "id": 589674,
+    "name": "Wilds Unknown Set Championship at Alternate Universes Blue Bell!",
+    "description": "Each player will get a promo just for entering! Top 8 finishers will also receive top 8 promos!\n\nWe will also give store credit to top finishers! Top 4 if we have 15 or less players, top 8 if we have 16 or more! $20 store credit will be\nadded to the prize pool per entrant!",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 07, 2026",
+    "time": "04:30 PM UTC",
+    "sort_dt_iso": "2026-06-07T16:30:00+00:00",
+    "store_name": "Alternate Universes - Blue Bell",
+    "store_address": "1510 Dekalb Pike, Blue Bell, PA, 19422, US",
+    "store_website": "https://www.alternateu.com",
+    "store_email": "patcatau@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "7 registered / 64 max",
+    "distance": 78.30205051649129,
+    "url": "https://tcg.ravensburgerplay.com/events/589674"
+  },
+  {
+    "id": 639449,
+    "name": "Sunday Afternoon Wilds Unknown Set Championship",
+    "description": "Holo Hideout's Disney Lorcana Wilds Unknown Set Championship, consisting of store credit prizing, champ mat for 1st place, custom holo hideout mat for 2nd place, and promos!",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 07, 2026",
+    "time": "04:30 PM UTC",
+    "sort_dt_iso": "2026-06-07T16:30:00+00:00",
+    "store_name": "Holo Hideout",
+    "store_address": "300, Litchfield Rd, Harwinton, CT, 06791, US",
+    "store_website": "https://www.facebook.com/p/Holo-Hideout-61578687735458/",
+    "store_email": "holohideout@yahoo.com",
+    "cost": "$25.00",
+    "cost_cents": 2500,
+    "spots": "19 registered / 24 max",
+    "distance": 87.1472171873214,
+    "url": "https://tcg.ravensburgerplay.com/events/639449"
+  },
+  {
+    "id": 516434,
+    "name": "Lorcana Store Champs",
+    "description": "Our store championships",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 07, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-07T17:00:00+00:00",
+    "store_name": "7th Dimension Games",
+    "store_address": "491 York Road, Jenkintown, PA 19046, Jenkintown, PA, 19046, US",
+    "store_website": "https://7thDimensionGames.com",
+    "store_email": "7thDimensionGames@gmail.com",
+    "cost": "$30.00",
+    "cost_cents": 3000,
+    "spots": "2 registered / 16 max",
+    "distance": 72.60787265595376,
+    "url": "https://tcg.ravensburgerplay.com/events/516434"
+  },
+  {
+    "id": 613667,
+    "name": "Saturday Morning Wilds Unknown Set Championship",
+    "description": "$20.00 entry fee includes two packs and the following prizing:\n1st place-Woody: Jungle Guide Championship mat and Foiled Promo\n2nd-8th Place- Woody: Jungle Guide Foiled Promo",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "03:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T15:00:00+00:00",
+    "store_name": "Sip & Play Boardgame Cafe",
+    "store_address": "471 5th Avenue, Brooklyn, NY, 11215, US",
+    "store_website": "https://sipnplaynyc.com",
+    "store_email": "sipnplaynyc@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "2 registered / 24 max",
+    "distance": 3.244638851448107,
+    "url": "https://tcg.ravensburgerplay.com/events/613667"
+  },
+  {
+    "id": 501365,
+    "name": "Lorcana Wilds Unknown Set Championship at Shore Gamers",
+    "description": "Set champ event promos + $20 per entry added to store credit prize pool 1: 40%, 2: 20%, 3-4: 10%, 5-8: 5%\nRegistration open on shoregamers.com/events.",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "03:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T15:00:00+00:00",
+    "store_name": "Shore Gamers",
+    "store_address": "40 Broad St, Red Bank, NJ, 07701, US",
+    "store_website": "https://shoregamers.com",
+    "store_email": "play@shoregamers.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "8 registered / 24 max",
+    "distance": 25.20817469084607,
+    "url": "https://tcg.ravensburgerplay.com/events/501365"
+  },
+  {
+    "id": 510015,
+    "name": "Saturday Morning Wilds Unknown Set Championship",
+    "description": "",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "03:30 PM UTC",
+    "sort_dt_iso": "2026-06-13T15:30:00+00:00",
+    "store_name": "Phantasm Gaming",
+    "store_address": "221 W Main St, Branford, CT, 06405, US",
+    "store_website": "https://phantasmgaming.crystalcommerce.com/",
+    "store_email": "info@phantasmgaming.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "8 registered / 32 max",
+    "distance": 71.58194145430218,
+    "url": "https://tcg.ravensburgerplay.com/events/510015"
+  },
+  {
+    "id": 609087,
+    "name": "Lorcana Wilds Unknown Set Championship Saturday 6-13-2026",
+    "description": "",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "03:30 PM UTC",
+    "sort_dt_iso": "2026-06-13T15:30:00+00:00",
+    "store_name": "Montasy Comics NYC, Inc",
+    "store_address": "431 5th Avenue, New York, NY, 10016, US",
+    "store_website": "https://www.montasycomicsnyc.com/",
+    "store_email": "montasychapter2@gmail.com",
+    "cost": "$32.00",
+    "cost_cents": 3200,
+    "spots": "0 registered / 16 max",
+    "distance": 2.9264407799398735,
+    "url": "https://tcg.ravensburgerplay.com/events/609087"
+  },
+  {
+    "id": 492424,
+    "name": "Saturday Wilds Unknown Set Championship",
+    "description": "Top 8 promo\n1st place champion mat\ntop 4 store credit\npacks per round win",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T16:00:00+00:00",
+    "store_name": "GamesinaDungeon",
+    "store_address": "64-73 Dry Harbor Rd, Queens, NY, 11379, US",
+    "store_website": "https://www.instagram.com/gamesinadungeon?igsh=MTB4dzRleG9yZGlvNw==",
+    "store_email": "isitwrongtoplaygames@gmail.com",
+    "cost": "$25.00",
+    "cost_cents": 2500,
+    "spots": "11 registered / 24 max",
+    "distance": 7.014482589564782,
+    "url": "https://tcg.ravensburgerplay.com/events/492424"
+  },
+  {
+    "id": 617979,
+    "name": "Gamers Heaven Wilds Unknown Set Championship",
+    "description": "",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T16:00:00+00:00",
+    "store_name": "Gamers Heaven Phoenixville",
+    "store_address": "275 Schuylkill Road, Phoenixville, PA, 19460, US",
+    "store_website": "https://gamers-heaven-phoenixville.square.site/",
+    "store_email": "ghphoenixville@gmail.com",
+    "cost": "$30.00",
+    "cost_cents": 3000,
+    "spots": "1 registered / 32 max",
+    "distance": 90.11713570256043,
+    "url": "https://tcg.ravensburgerplay.com/events/617979"
+  },
+  {
+    "id": 647097,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "Lets get wild with Wilds Unknown Set Champs! 100% of entries taken in will be paid out in store credit; our store is stocked with booster boxes singles, and gaming supplies!\n\n***Bonus: at 16 players we will make the prize pool $500***\nEntry: $20\nEvent Type: 60 card core constructed - Best of 3\nDeck Lists Required\n\nPrizes\n1st Place - Store Champion Playmat, Promo Card, 40% Prize Pool\n2nd Place - Promo Card, 20% Prize Pool\n3rd-4th - Promo Card, 10% Prize Pool\n5th-8th - Promo Card, 5% Prize Pool\n\nExtra Promo Cards given out to all entrants!\n\n8 Players - 3 rounds - no cut\n9-16 Players - 4 rounds - top 4 cut\n17-32 Players - 5 rounds - top 8 cut",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T16:00:00+00:00",
+    "store_name": "The Encounter",
+    "store_address": "811 Union Boulevard, Allentown, PA, 18109, US",
+    "store_website": "https://facebook.com/encountercomics",
+    "store_email": "kfeinman86@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "1 registered / 32 max",
+    "distance": 75.6219942357825,
+    "url": "https://tcg.ravensburgerplay.com/events/647097"
+  },
+  {
+    "id": 580799,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "<div>Wilds Unknown Set Championship at New Kawaii!</div>\n<div>Competitive Swiss with Top Cut\n<p>Visit our website for details</p></div>\n<div>\nSaturday, June 13, 2026 (new date)\nStart 12:30 pm\nCheck-in 12 pm\n</div>",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "04:30 PM UTC",
+    "sort_dt_iso": "2026-06-13T16:30:00+00:00",
+    "store_name": "New Kawaii",
+    "store_address": "ste 105, 1, Bridge St, Irvington, NY, 10533, US",
+    "store_website": "https://newkawaii.com",
+    "store_email": "shop@newkawaii.com",
+    "cost": "$10.00",
+    "cost_cents": 1000,
+    "spots": "3 registered / 32 max",
+    "distance": 23.59865888047259,
+    "url": "https://tcg.ravensburgerplay.com/events/580799"
+  },
+  {
+    "id": 516049,
+    "name": "Wilds Unknown Set Championship",
+    "description": "We will be running Lorcana Wilds Unknown Set Championship.\n\nPrizing will be according to the championship kit as well as random giveaways.\n\nTop 4 will get store credit prize support.\n\nAll matches will be best of 3.",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T17:00:00+00:00",
+    "store_name": "Adventure Games PA",
+    "store_address": "851 Main Street, Dickson City, PA, 18519, US",
+    "store_website": "https://www.adventuregamespa.com/",
+    "store_email": "agllc2000@gmail.com",
+    "cost": "$10.00",
+    "cost_cents": 1000,
+    "spots": "3 registered / 32 max",
+    "distance": 98.82089170584254,
+    "url": "https://tcg.ravensburgerplay.com/events/516049"
+  },
+  {
+    "id": 659577,
+    "name": "ICG Wilds Unknown Set Championship",
+    "description": "Entry: $25 (Paid in store day of the event)",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T17:00:00+00:00",
+    "store_name": "Illustrious Cards and Games LLC",
+    "store_address": "45 Lafayette Road, Woodbridge Township, NJ, 08863, US",
+    "store_website": "https://www.illustriouscardandgames.com/",
+    "store_email": "illustriouscardsandgames@gmail.com",
+    "cost": "Free",
+    "cost_cents": 0,
+    "spots": "0 registered / 32 max",
+    "distance": 20.12156005663916,
+    "url": "https://tcg.ravensburgerplay.com/events/659577"
+  },
+  {
+    "id": 635281,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "Wilds Unknown Set Championship",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T17:00:00+00:00",
+    "store_name": "Shipwreck Games",
+    "store_address": "118 North Main Street, Suite 1, Forked River, NJ, 08731, US",
+    "store_website": null,
+    "store_email": "parley@shipwreckgamesnj.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "9 registered / 32 max",
+    "distance": 60.93673052261596,
+    "url": "https://tcg.ravensburgerplay.com/events/635281"
+  },
+  {
+    "id": 528758,
+    "name": "Saturday Afternoon Wilds Unknown Set Championship",
+    "description": "DETAILS TO BE UPDATED",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "05:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T17:00:00+00:00",
+    "store_name": "Highlander Games",
+    "store_address": "123 Boonton Avenue, Boonton, NJ, 07005, US",
+    "store_website": "https://www.highlandergamesnj.com/",
+    "store_email": "highlandergamesnj@gmail.com",
+    "cost": "Free",
+    "cost_cents": 0,
+    "spots": "9 registered / 32 max",
+    "distance": 25.05143205029097,
+    "url": "https://tcg.ravensburgerplay.com/events/528758"
+  },
+  {
+    "id": 609719,
+    "name": "Lorcana Wilds Unknown Set Championship",
+    "description": "Lorcana Wilds Unknown Set Championship Standard Constructed Tournament.",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "07:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T19:00:00+00:00",
+    "store_name": "Alterniverse",
+    "store_address": "874 New York 9G, Hyde Park, NY, 12538, US",
+    "store_website": "https://www.alterniverse.net/",
+    "store_email": "alterniverse2@aol.com",
+    "cost": "$25.00",
+    "cost_cents": 2500,
+    "spots": "3 registered / 24 max",
+    "distance": 73.38513851198056,
+    "url": "https://tcg.ravensburgerplay.com/events/609719"
+  },
+  {
+    "id": 535087,
+    "name": "Saturday Wilds Unknown Set Championship",
+    "description": "Champion gets exclusive Woody playmat and *CHOICE* of a giant Lorcana card\nTop 8 get foil promo card\nEveryone gets :\npack per win \nnon foil promo card\ntwo random past promo cards",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "10:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T22:00:00+00:00",
+    "store_name": "Fantasy Bay",
+    "store_address": "726 Broadway, Bayonne, NJ, 07002, US",
+    "store_website": null,
+    "store_email": "FantasyBayLLC@Gmail.com",
+    "cost": "$15.00",
+    "cost_cents": 1500,
+    "spots": "9 registered / 16 max",
+    "distance": 6.209050952586037,
+    "url": "https://tcg.ravensburgerplay.com/events/535087"
+  },
+  {
+    "id": 581254,
+    "name": "Saturday Evening Wilds Unknown Set Championship",
+    "description": "Applying is the first step, but it DOES NOT guarantee your seat.\n\nHOW TO SECURE YOUR SPOT:\n1. IN-SHOP: Visit us at Choose me tcg to pay your entry fee in person.\n2. DISCORD: Join our Discord and message us to confirm your entry or request a digital payment link. Discord link: https://discord.gg/zrX8FSTRUx\n\nOnce you have joined the discord, please send a direct Message to ChooseMe_Bobby2fiddy and they will be able to provide you with the Secure we payment link. Or arrange a time for you To pay in shop locally. \n\nTHE 48-HOUR RULE:\nIf we do not receive payment or a direct confirmation via Discord within 48 hours of your application, your spot will be forfeited. We will move your status to \"Rejected\" in the portal to allow the next person on the waitlist to join.\nLate arrivals (5 minutes past start time) may have their spots given to standby players. Thank you for supporting Choose me tcg and helping us run a fair event!",
+    "game_type": "Lorcana",
+    "date": "Saturday, June 13, 2026",
+    "time": "10:00 PM UTC",
+    "sort_dt_iso": "2026-06-13T22:00:00+00:00",
+    "store_name": "Choose Me TCG - Oreland",
+    "store_address": "6, Allison Rd, Oreland, PA, 19075, US",
+    "store_website": "https://instagram.com/choosemetcg",
+    "store_email": "choosemetcg@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "12 registered / 12 max",
+    "distance": 74.3873536119446,
+    "url": "https://tcg.ravensburgerplay.com/events/581254"
+  },
+  {
+    "id": 589971,
+    "name": "Sunday Morning Wilds Unknown Set Championship",
+    "description": "Will you and your Brave glimmers of all shapes and plastics successfully traverse through the Wilds Unknown to become this sets Lorcana Champion?\n\nEntry: $25\nDeck lists will be required. \nDoors open/registration starts at 9:45am, first round starts at 10:30am\nRSVP via our Discord server. A link to our server can be found in our website: https://www.phillygameshop.com/\n\nTOURNAMENT DETAILS:\n\nFormat: Core (Constructed) \n Rules Enforcement: Competitive.\nStructure: Swiss Rounds with Top Cut, number of rounds and top cut depends on attendance\n Swiss Rounds: 60 minutes, best-of-three \nTop Cut Rounds: Top 8 and Top 4, 70 minutes Best-of-three format \nUntimed, Best-of-three Final Round\n\nPRIZES:\n\n The winner receives:\n1 Woody \u2013 Jungle Guide Champion playmat\n1 Woody \u2013 Jungle Guide foil promo card\n\nRunner up receives:\n1 Woody \u2013 Jungle Guide foil promo card\n1 Discard error card\n\nThird through Eighth-Place Finishers each receive:\n 1 Woody \u2013 Jungle Guide foil promo cards\n\nAll Participants receive:\n 1 Woody \u2013 Jungle Guide non-foil promo card\n\nTop four will also receive a sealed Wilds Unknown Booster box. \n(A total of 16+ participants required for add. top 4 prizing)\n\nCONTACT:\n\nEmail: Staff@phillygameshop.com \nPhone: 215-305-9230 \nWebsite: phillygameshop.com",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "02:30 PM UTC",
+    "sort_dt_iso": "2026-06-14T14:30:00+00:00",
+    "store_name": "Philly Game Shop",
+    "store_address": "521 South 5th Street, Philadelphia, PA, 19147, US",
+    "store_website": "https://www.phillygameshop.com/",
+    "store_email": "taylor@phillygameshop.com",
+    "cost": "$25.00",
+    "cost_cents": 2500,
+    "spots": "0 registered / 32 max",
+    "distance": 80.433428471492,
+    "url": "https://tcg.ravensburgerplay.com/events/589971"
+  },
+  {
+    "id": 586898,
+    "name": "Wilds Unknown Set Championship",
+    "description": "Set Championship for Wilds Unknown!\n\nCompete for the Woody - Jungle Guide prize cards and playmat! We'll also be awarding pack prizing to all players based on their performance in the Swiss phase of the tournament.\n\nThe following is based on 5 rounds of play with 32 players. Point and prizing thresholds will be adjusted based on turnout.\n\nTop Seed: Win a box!<br>\n10+ Points: 6 packs<br>\n6+ Points: 4 packs<br>\n3+ Points: 2 packs<br>\n0+ Points: 1 pack<br>\nAll: Woody - Jungle Guide Promo\n\nTop Cut Prizing<br>\nTop 8: Enchanted Woody - Jungle Guide<br>\n2nd Place:  3 Additional Packs <br>\n1st Place: 5 Additional Pacls + Champion Playmat<br>",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "03:00 PM UTC",
+    "sort_dt_iso": "2026-06-14T15:00:00+00:00",
+    "store_name": "The Uncommons",
+    "store_address": "230 Thompson Street, New York, NY, 10012, US",
+    "store_website": "https://uncommonsnyc.com/",
+    "store_email": "uncommonsmanager@gmail.com",
+    "cost": "$40.00",
+    "cost_cents": 4000,
+    "spots": "1 registered / 32 max",
+    "distance": 1.2095628432478158,
+    "url": "https://tcg.ravensburgerplay.com/events/586898"
+  },
+  {
+    "id": 559673,
+    "name": "Waffles and Enthusiasm Wilds Unknown Set Championship 6-14-2026",
+    "description": "$20 entry fee, each player will receive one non-foil promo card for participation. No deck lists! Format: Constructed. Best two-out-of-three 50 minute swiss rounds with top cut. Top eight will receive one foil promo card. Four *Wilds Unknown* booster packs will be added to the prize pool for every one player in the tournament. *Wilds Unknown* booster packs will also be awarded to the top finishers. First Place will also win one *Wilds Unknown* Set Championship playmat. Players will sign up for this tournament here and will pay for the tournament in the store during the day of the tournament. Minimum eight players needed for the tournament to happen.\n\nWaffles and Enthusiasm \n414 W Ridge Pike\nConshohocken, PA 19428\n\n**Parking Information**: Please don't park in front of Waffles and Enthusiasm, Conshohocken Smoke Shop, Hertz, and Beyond Chiropractic during tournaments. If you are at Waffles and Enthusiasm for a tournament, please park in the West Ridge Center parking lot on the side with Piatto Grille, Ashish LED, Mon Cheri Nails, etc. The parking lot snakes around Beyond Chiropractic. There are plenty of parking spaces. Thank you for understanding.",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-14T16:00:00+00:00",
+    "store_name": "Waffles and Enthusiasm",
+    "store_address": "414 W Ridge Pike, Conshohocken, PA, 19428, US",
+    "store_website": "https://www.wafflesandenthusiasm.com",
+    "store_email": "wafflesandenthusiasmllc@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "14 registered / 32 max",
+    "distance": 80.0157527582828,
+    "url": "https://tcg.ravensburgerplay.com/events/559673"
+  },
+  {
+    "id": 600131,
+    "name": "Lorcana Wilds Unknown Set Championship",
+    "description": "Disney Lorcana Wilds Unknown Store Championship - Sunday June 14 at 12 Noon\n\nSee the event listing for details and Registration info:\n\nhttps://www.facebook.com/events/883230478134702",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-14T16:00:00+00:00",
+    "store_name": "Comic Fusion",
+    "store_address": "16 Turntable Junction, Flemington, NJ, 08822, US",
+    "store_website": "https://www.facebook.com/ComicFusion/",
+    "store_email": "info@comicfusion.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "0 registered / 16 max",
+    "distance": 47.05153455455695,
+    "url": "https://tcg.ravensburgerplay.com/events/600131"
+  },
+  {
+    "id": 532369,
+    "name": "Sunday Afternoon Wilds Unknown Set Championship",
+    "description": "",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-14T16:00:00+00:00",
+    "store_name": "Sorcery and Scripts",
+    "store_address": "74, W Broad St, Bethlehem, PA, 18018, US",
+    "store_website": "https://sorceryandscripts.square.site/",
+    "store_email": "sorceryandscripts@gmail.com",
+    "cost": "$10.00",
+    "cost_cents": 1000,
+    "spots": "2 registered / 30 max",
+    "distance": 72.3522433950469,
+    "url": "https://tcg.ravensburgerplay.com/events/532369"
+  },
+  {
+    "id": 642935,
+    "name": "Sunday Afternoon Wilds Unknown Set Championship",
+    "description": "Wilds Unknown Set Championship",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-14T16:00:00+00:00",
+    "store_name": "LessGotcg",
+    "store_address": "345 Windsor Highway, Ste #200, New Windsor, NY, 12553, US",
+    "store_website": null,
+    "store_email": "info@lessgotcg.com",
+    "cost": "$25.00",
+    "cost_cents": 2500,
+    "spots": "0 registered / 32 max",
+    "distance": 53.668324019745874,
+    "url": "https://tcg.ravensburgerplay.com/events/642935"
+  },
+  {
+    "id": 535164,
+    "name": "Sunday Afternoon Wilds Unknown Set Championship",
+    "description": "",
+    "game_type": "Lorcana",
+    "date": "Sunday, June 14, 2026",
+    "time": "04:00 PM UTC",
+    "sort_dt_iso": "2026-06-14T16:00:00+00:00",
+    "store_name": "JNC Collectibles",
+    "store_address": "1338, E 4th St, Bethlehem, PA, 18015, US",
+    "store_website": "https://www.facebook.com/profile.php?id=61572047653783",
+    "store_email": "jnccollectibles667@gmail.com",
+    "cost": "$20.00",
+    "cost_cents": 2000,
+    "spots": "0 registered / 16 max",
+    "distance": 71.03307467348058,
+    "url": "https://tcg.ravensburgerplay.com/events/535164"
+  }
+];
+        
+        let showLorcana = true;
+        let showRiftbound = true;
+        let maxDistance = 100;
+        let searchQuery = "";
+        
+        const searchInput = document.getElementById("search-input");
+        const distanceSlider = document.getElementById("distance-slider");
+        const distanceDisplay = document.getElementById("distance-display");
+        const toggleLorcanaBtn = document.getElementById("toggle-lorcana");
+        const toggleRiftboundBtn = document.getElementById("toggle-riftbound");
+        
+        const lorcanaContainer = document.getElementById("lorcana-container");
+        const riftboundContainer = document.getElementById("riftbound-container");
+        const lorcanaCount = document.getElementById("lorcana-count");
+        const riftboundCount = document.getElementById("riftbound-count");
+        
+        const lorcanaSection = document.getElementById("lorcana-section");
+        const riftboundSection = document.getElementById("riftbound-section");
+        
+        // Render events client-side based on active filters
+        function renderEvents() {
+            // Filter elements
+            const filtered = ALL_EVENTS.filter(ev => {
+                // Game toggle
+                if (ev.game_type === "Lorcana" && !showLorcana) return false;
+                if (ev.game_type === "Riftbound" && !showRiftbound) return false;
+                
+                // Distance check
+                if (ev.distance > maxDistance) return false;
+                
+                // Search query check
+                if (searchQuery) {
+                    const q = searchQuery.toLowerCase();
+                    const nameMatch = ev.name.toLowerCase().includes(q);
+                    const storeMatch = ev.store_name.toLowerCase().includes(q);
+                    const addressMatch = ev.store_address.toLowerCase().includes(q);
+                    const descMatch = (ev.description || "").toLowerCase().includes(q);
+                    if (!nameMatch && !storeMatch && !addressMatch && !descMatch) return false;
+                }
+                
+                return true;
+            });
+            
+            // Separate lists
+            const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana");
+            const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound");
+            
+            // Show/Hide section column if game toggle is unchecked
+            lorcanaSection.style.display = showLorcana ? "block" : "none";
+            riftboundSection.style.display = showRiftbound ? "block" : "none";
+            
+            // Update badges
+            lorcanaCount.textContent = `${lorcanaList.length} Found`;
+            riftboundCount.textContent = `${riftboundList.length} Found`;
+            
+            // Render Lorcana
+            lorcanaContainer.innerHTML = lorcanaList.length === 0 
+                ? `<div class="no-events">No matching Lorcana events.</div>`
+                : lorcanaList.map(ev => generateEventCard(ev, "lorcana")).join("");
+                
+            // Render Riftbound
+            riftboundContainer.innerHTML = riftboundList.length === 0 
+                ? `<div class="no-events">No matching Riftbound skirmishes.</div>`
+                : riftboundList.map(ev => generateEventCard(ev, "riftbound")).join("");
+        }
+        
+        function generateEventCard(ev, styleClass) {
+            return `
+                <div class="event-card ${styleClass}-card">
+                    <div>
+                        <div class="event-header">
+                            <h3 class="event-name">${ev.name}</h3>
+                            <span class="event-distance">${ev.distance.toFixed(1)} mi</span>
+                        </div>
+                        <div class="event-details">
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span>${ev.date}</span>
+                            </div>
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                <span>${ev.time}</span>
+                            </div>
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                <span>${ev.store_name} (${ev.store_address})</span>
+                            </div>
+                            <div class="detail-row">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                <span>${ev.spots}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="event-footer">
+                        <span class="event-cost">${ev.cost}</span>
+                        <a href="${ev.url}" target="_blank" class="btn-register">
+                            View Details
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Listeners
+        searchInput.addEventListener("input", (e) => {
+            searchQuery = e.target.value;
+            renderEvents();
+        });
+        
+        distanceSlider.addEventListener("input", (e) => {
+            maxDistance = Number(e.target.value);
+            distanceDisplay.textContent = `${maxDistance} mi`;
+            renderEvents();
+        });
+        
+        toggleLorcanaBtn.addEventListener("click", () => {
+            showLorcana = !showLorcana;
+            toggleLorcanaBtn.classList.toggle("active", showLorcana);
+            renderEvents();
+        });
+        
+        toggleRiftboundBtn.addEventListener("click", () => {
+            showRiftbound = !showRiftbound;
+            toggleRiftboundBtn.classList.toggle("active", showRiftbound);
+            renderEvents();
+        });
+        
+        // Initial load
+        renderEvents();
+    </script>
+</body>
+</html>
