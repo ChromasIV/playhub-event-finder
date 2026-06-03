@@ -742,8 +742,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             try {{
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${{encodeURIComponent(address)}}&limit=1`, {{
                     headers: {{
-                        'Accept': 'application/json',
-                        'User-Agent': 'playhub-event-finder-client'
+                        'Accept': 'application/json'
                     }}
                 }});
                 const data = await response.json();

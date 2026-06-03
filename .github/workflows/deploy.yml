@@ -34,6 +34,17 @@ jobs:
       - name: Fetch events and generate index.html
         run: python find_events.py
 
+      - name: Install dependencies for testing
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Run Unit Tests
+        run: python test_events.py
+
+      - name: Run Integration Tests
+        run: python test_integration.py
+
       - name: Prepare release package
         run: |
           mkdir dist

@@ -1,5 +1,5 @@
 /*
-Theme Version: 1.1.0
+Theme Version: 1.1.2
 */
 
 body {
@@ -8,4 +8,9 @@ body {
     color: #f3f4f6;
     margin: 0;
     padding: 20px;
+}
+
+select option {
+    background-color: #0b0f19;
+    color: #ffffff;
 }
