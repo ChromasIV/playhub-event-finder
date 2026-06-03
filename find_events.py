@@ -6,10 +6,35 @@ import sys
 import os
 from datetime import datetime
 
+def safe_print(text):
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        try:
+            encoding = sys.stdout.encoding or 'utf-8'
+            print(text.encode(encoding, errors='replace').decode(encoding))
+        except Exception:
+            try:
+                print(text.encode('utf-8', errors='replace').decode('utf-8', errors='replace'))
+            except Exception:
+                pass
+
 # Default parameters
-DEFAULT_LAT = 28.2238
-DEFAULT_LON = -82.4549
+DEFAULT_LAT = 27.9506
+DEFAULT_LON = -82.4572
 DEFAULT_RADIUS = 100
+
+def haversine(lat1, lon1, lat2, lon2):
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+        return 9999.0
+    R = 3958.8  # Earth radius in miles
+    dLat = math.radians(lat2 - lat1)
+    dLon = math.radians(lon2 - lon1)
+    a = math.sin(dLat/2) * math.sin(dLat/2) + \
+        math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * \
+        math.sin(dLon/2) * math.sin(dLon/2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -43,19 +68,27 @@ def detect_location_from_ip():
     return {
         'lat': DEFAULT_LAT,
         'lon': DEFAULT_LON,
-        'city': "Land O' Lakes",
+        'city': "Tampa",
         'region': "Florida"
     }
 
-def get_events(game_slug, lat, lon, radius):
+def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
     events = []
     page = 1
-    url = f"https://api.riftbound.uvsgames.com/api/v2/events/?latitude={lat}&longitude={lon}&num_miles={radius}&game_slug={game_slug}&upcoming_only=true&page_size=100"
     
+    if lat is not None and lon is not None and radius is not None:
+        url = f"https://api.riftbound.uvsgames.com/api/v2/events/?latitude={lat}&longitude={lon}&num_miles={radius}&game_slug={game_slug}&upcoming_only=true&page_size=100"
+    else:
+        url = f"https://api.riftbound.uvsgames.com/api/v2/events/?game_slug={game_slug}&upcoming_only=true&page_size=100"
+        if keyword:
+            url += f"&name={urllib.parse.quote(keyword)}"
+            
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
-    print(f"Fetching {game_slug} events...")
-    while url:
+    print(f"Fetching {game_slug} events (URL: {url})...")
+    max_pages = 15 if game_slug == "disney-lorcana" else 40
+    
+    while url and page <= max_pages:
         try:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req) as response:
@@ -71,7 +104,7 @@ def get_events(game_slug, lat, lon, radius):
     print(f"Retrieved {len(events)} total upcoming events for {game_slug}.")
     return events
 
-def filter_and_format_events(events, game_type, keywords):
+def filter_and_format_events(events, game_type, keywords, user_lat=None, user_lon=None):
     filtered = []
     for item in events:
         name = item.get('name', '')
@@ -92,6 +125,16 @@ def filter_and_format_events(events, game_type, keywords):
         store_address = store.get('full_address', item.get('full_address', 'Unknown Address'))
         store_website = store.get('website')
         store_email = store.get('email')
+        
+        # Extract store coordinates
+        store_lat = store.get('latitude') or item.get('latitude')
+        store_lon = store.get('longitude') or item.get('longitude')
+        try:
+            event_lat = float(store_lat) if store_lat is not None else None
+            event_lon = float(store_lon) if store_lon is not None else None
+        except (ValueError, TypeError):
+            event_lat = None
+            event_lon = None
         
         start_str = item.get('start_datetime', '')
         # Parse start date
@@ -125,7 +168,11 @@ def filter_and_format_events(events, game_type, keywords):
         if capacity:
             spots_str += f" / {capacity} max"
             
-        dist = item.get('distance_in_miles')
+        # Calculate distance if user coords are available, otherwise use API distance or 9999.0
+        if user_lat is not None and user_lon is not None and event_lat is not None and event_lon is not None:
+            dist = haversine(user_lat, user_lon, event_lat, event_lon)
+        else:
+            dist = item.get('distance_in_miles') or 9999.0
         
         filtered.append({
             'id': event_id,
@@ -143,6 +190,8 @@ def filter_and_format_events(events, game_type, keywords):
             'cost_cents': cost_cents,
             'spots': spots_str,
             'distance': dist,
+            'lat': event_lat,
+            'lon': event_lon,
             'url': reg_url
         })
         
@@ -218,6 +267,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             color: var(--text-muted);
             margin-top: 10px;
             font-family: 'Inter', sans-serif;
+            line-height: 1.5;
         }}
         
         .meta-info strong {{
@@ -549,7 +599,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             <h1>Playhub Weekly Match Finder</h1>
             <div class="meta-info">
                 Report generated on <strong>{now_str}</strong><br>
-                Current Location: <strong>{location_name}</strong> ({lat}, {lon})
+                Current Search Center: <strong id="center-display-name">{location_name}</strong> (<span id="center-lat">{lat}</span>, <span id="center-lon">{lon}</span>)
             </div>
         </header>
         
@@ -557,18 +607,30 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         <div class="control-panel">
             <div class="filter-row">
                 <!-- Real-time text search -->
-                <div class="filter-group" style="flex: 2;">
+                <div class="filter-group" style="flex: 2; min-width: 250px;">
                     <label for="search-input">Search Events</label>
                     <div class="search-input-wrapper">
                         <input type="text" id="search-input" placeholder="Search by name, store, or address...">
                     </div>
                 </div>
                 
+                <!-- Client-side location search -->
+                <div class="filter-group" style="flex: 2; min-width: 250px;">
+                    <label for="location-input">Search Center Location</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="location-input" placeholder="City, State, Zip or Country..." style="flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 0.95rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-riftbound)'" onblur="this.style.borderColor='var(--border-color)'">
+                        <button id="location-search-btn" style="background: var(--gradient-riftbound); border: none; border-radius: 10px; color: #ffffff; padding: 0 20px; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">Search</button>
+                    </div>
+                    <div id="location-status" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; font-family: 'Inter', sans-serif;"></div>
+                </div>
+            </div>
+            
+            <div class="filter-row" style="margin-top: 10px;">
                 <!-- Client-side distance slider -->
-                <div class="filter-group">
-                    <label for="distance-slider">Distance (max {radius} mi)</label>
+                <div class="filter-group" style="flex: 1; min-width: 200px;">
+                    <label for="distance-slider">Distance Radius (max <span id="max-distance-label">500</span> mi)</label>
                     <div class="slider-wrapper">
-                        <input type="range" id="distance-slider" min="1" max="{radius}" value="{radius}">
+                        <input type="range" id="distance-slider" min="1" max="500" value="{radius}">
                         <div class="slider-value" id="distance-display">{radius} mi</div>
                     </div>
                 </div>
@@ -621,12 +683,21 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         let showRiftbound = true;
         let maxDistance = {radius};
         let searchQuery = "";
+        let currentLat = {lat};
+        let currentLon = {lon};
         
         const searchInput = document.getElementById("search-input");
         const distanceSlider = document.getElementById("distance-slider");
         const distanceDisplay = document.getElementById("distance-display");
         const toggleLorcanaBtn = document.getElementById("toggle-lorcana");
         const toggleRiftboundBtn = document.getElementById("toggle-riftbound");
+        
+        const locationInput = document.getElementById("location-input");
+        const locationSearchBtn = document.getElementById("location-search-btn");
+        const locationStatus = document.getElementById("location-status");
+        const centerDisplayName = document.getElementById("center-display-name");
+        const centerLatSpan = document.getElementById("center-lat");
+        const centerLonSpan = document.getElementById("center-lon");
         
         const lorcanaContainer = document.getElementById("lorcana-container");
         const riftboundContainer = document.getElementById("riftbound-container");
@@ -635,6 +706,63 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         
         const lorcanaSection = document.getElementById("lorcana-section");
         const riftboundSection = document.getElementById("riftbound-section");
+        
+        // Haversine formula client-side
+        function calculateHaversine(lat1, lon1, lat2, lon2) {{
+            if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return 9999;
+            const R = 3958.8; // miles
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(math.sqrt(a), math.sqrt(1-a));
+            return R * c;
+        }}
+        
+        // Geocode address using Nominatim
+        async function geocodeAddress(address) {{
+            if (!address.trim()) return;
+            locationStatus.textContent = "🔍 Geocoding location...";
+            locationStatus.style.color = "var(--text-muted)";
+            try {{
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${{encodeURIComponent(address)}}&limit=1`, {{
+                    headers: {{
+                        'Accept': 'application/json',
+                        'User-Agent': 'playhub-event-finder-client'
+                    }}
+                }});
+                const data = await response.json();
+                if (data && data.length > 0) {{
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    const name = data[0].display_name.split(',')[0] + ', ' + (data[0].display_name.split(',')[1] || '').trim();
+                    
+                    currentLat = lat;
+                    currentLon = lon;
+                    
+                    centerDisplayName.textContent = name;
+                    centerLatSpan.textContent = lat.toFixed(4);
+                    centerLonSpan.textContent = lon.toFixed(4);
+                    locationStatus.textContent = "✅ Location updated successfully!";
+                    locationStatus.style.color = "#34d399";
+                    
+                    // Recalculate distances for all events
+                    ALL_EVENTS.forEach(ev => {{
+                        ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
+                    }});
+                    
+                    renderEvents();
+                }} else {{
+                    locationStatus.textContent = "❌ Location not found. Try adding city/state.";
+                    locationStatus.style.color = "#f87171";
+                }}
+            }} catch (error) {{
+                console.error("Geocoding error:", error);
+                locationStatus.textContent = "❌ Error connecting to geocoder.";
+                locationStatus.style.color = "#f87171";
+            }}
+        }}
         
         // Render events client-side based on active filters
         function renderEvents() {{
@@ -660,9 +788,9 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 return true;
             }});
             
-            // Separate lists
-            const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana");
-            const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound");
+            // Separate lists and sort by distance
+            const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana").sort((a, b) => a.distance - b.distance);
+            const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound").sort((a, b) => a.distance - b.distance);
             
             // Show/Hide section column if game toggle is unchecked
             lorcanaSection.style.display = showLorcana ? "block" : "none";
@@ -674,22 +802,23 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             
             // Render Lorcana
             lorcanaContainer.innerHTML = lorcanaList.length === 0 
-                ? `<div class="no-events">No matching Lorcana events.</div>`
+                ? `<div class="no-events">No matching Lorcana events within range.</div>`
                 : lorcanaList.map(ev => generateEventCard(ev, "lorcana")).join("");
                 
             // Render Riftbound
             riftboundContainer.innerHTML = riftboundList.length === 0 
-                ? `<div class="no-events">No matching Riftbound skirmishes.</div>`
+                ? `<div class="no-events">No matching Riftbound skirmishes within range.</div>`
                 : riftboundList.map(ev => generateEventCard(ev, "riftbound")).join("");
         }}
         
         function generateEventCard(ev, styleClass) {{
+            const distStr = ev.distance !== 9999 ? `${{ev.distance.toFixed(1)}} mi` : "Unknown dist";
             return `
                 <div class="event-card ${{styleClass}}-card">
                     <div>
                         <div class="event-header">
                             <h3 class="event-name">${{ev.name}}</h3>
-                            <span class="event-distance">${{ev.distance.toFixed(1)}} mi</span>
+                            <span class="event-distance">${{distStr}}</span>
                         </div>
                         <div class="event-details">
                             <div class="detail-row">
@@ -745,7 +874,20 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             renderEvents();
         }});
         
-        // Initial load
+        locationInput.addEventListener("keypress", (e) => {{
+            if (e.key === "Enter") {{
+                geocodeAddress(locationInput.value);
+            }}
+        }});
+        
+        locationSearchBtn.addEventListener("click", () => {{
+            geocodeAddress(locationInput.value);
+        }});
+        
+        // Initial load (calculate distances from the default location first)
+        ALL_EVENTS.forEach(ev => {{
+            ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
+        }});
         renderEvents();
     </script>
 </body>
@@ -764,22 +906,29 @@ def main():
     default_lat = config.get("default_latitude", DEFAULT_LAT)
     default_lon = config.get("default_longitude", DEFAULT_LON)
     radius = config.get("radius_miles", DEFAULT_RADIUS)
+    global_mode = config.get("global_mode", False) or "GITHUB_ACTIONS" in os.environ
     
     lorcana_keywords = config.get("lorcana_keywords", ["championship", "championset", "champion"])
     riftbound_keywords = config.get("riftbound_keywords", ["skirmish"])
     
     # 1. Geolocation detection
-    # Skip dynamic IP location detection under GitHub Actions to avoid geolocating the runner's server center.
-    if auto_detect and "GITHUB_ACTIONS" not in os.environ:
-        loc = detect_location_from_ip()
-        lat = loc['lat']
-        lon = loc['lon']
-        location_name = f"{loc['city']}, {loc['region']}"
-    else:
+    if global_mode:
+        print("Running in Global Mode (fetching upcoming events globally and filtering by key terms)...")
         lat = default_lat
         lon = default_lon
-        location_name = "Configured Location"
-        
+        location_name = "Tampa, FL"
+    else:
+        # Skip dynamic IP location detection under GitHub Actions to avoid geolocating the runner's server center.
+        if auto_detect and "GITHUB_ACTIONS" not in os.environ:
+            loc = detect_location_from_ip()
+            lat = loc['lat']
+            lon = loc['lon']
+            location_name = f"{loc['city']}, {loc['region']}"
+        else:
+            lat = default_lat
+            lon = default_lon
+            location_name = "Configured Location"
+            
     # Optional arguments parser overrides
     if len(sys.argv) >= 3:
         try:
@@ -788,41 +937,46 @@ def main():
             location_name = "Command Line Arguments"
             if len(sys.argv) >= 4:
                 radius = int(sys.argv[3])
+            global_mode = False # Manual coordinates override global mode
         except:
             print("Invalid arguments. Usage: python find_events.py [latitude] [longitude] [radius_miles]")
             sys.exit(1)
             
-    print(f"Searching events within {radius} miles of coordinates ({lat}, {lon}) ({location_name})")
-    
-    # 2. Fetch upcoming Disney Lorcana events (game=1)
-    lorcana_raw = get_events("disney-lorcana", lat, lon, radius)
-    lorcana_matches = filter_and_format_events(lorcana_raw, "Lorcana", lorcana_keywords)
-    
-    # 3. Fetch upcoming Riftbound events (game=3)
-    riftbound_raw = get_events("riftbound", lat, lon, radius)
-    riftbound_matches = filter_and_format_events(riftbound_raw, "Riftbound", riftbound_keywords)
+    if global_mode:
+        print(f"Searching events globally. Initial center set to: {location_name} ({lat}, {lon})")
+        lorcana_raw = get_events("disney-lorcana", keyword="champion")
+        riftbound_raw = get_events("riftbound", keyword="skirmish")
+    else:
+        print(f"Searching events within {radius} miles of coordinates ({lat}, {lon}) ({location_name})")
+        lorcana_raw = get_events("disney-lorcana", lat, lon, radius)
+        riftbound_raw = get_events("riftbound", lat, lon, radius)
+        
+    lorcana_matches = filter_and_format_events(lorcana_raw, "Lorcana", lorcana_keywords, user_lat=lat, user_lon=lon)
+    riftbound_matches = filter_and_format_events(riftbound_raw, "Riftbound", riftbound_keywords, user_lat=lat, user_lon=lon)
     
     all_matches = lorcana_matches + riftbound_matches
     
-    print("\n" + "="*50)
-    print(f"FOUND {len(lorcana_matches)} LORCANA CHAMPIONSHIPS:")
-    print("="*50)
+    safe_print("\n" + "="*50)
+    safe_print(f"FOUND {len(lorcana_matches)} LORCANA CHAMPIONSHIPS:")
+    safe_print("="*50)
     for idx, ev in enumerate(lorcana_matches, 1):
-        print(f"{idx}. {ev['name']}")
-        print(f"   Date: {ev['date']} at {ev['time']}")
-        print(f"   Store: {ev['store_name']} ({ev['distance']:.1f} miles away)")
-        print(f"   Spots: {ev['spots']} | Cost: {ev['cost']}")
-        print("-" * 50)
+        dist_str = f"{ev['distance']:.1f} miles away" if ev['distance'] != 9999.0 else "distance unknown"
+        safe_print(f"{idx}. {ev['name']}")
+        safe_print(f"   Date: {ev['date']} at {ev['time']}")
+        safe_print(f"   Store: {ev['store_name']} ({dist_str})")
+        safe_print(f"   Spots: {ev['spots']} | Cost: {ev['cost']}")
+        safe_print("-" * 50)
         
-    print("\n" + "="*50)
-    print(f"FOUND {len(riftbound_matches)} RIFTBOUND SKIRMISHES:")
-    print("="*50)
+    safe_print("\n" + "="*50)
+    safe_print(f"FOUND {len(riftbound_matches)} RIFTBOUND SKIRMISHES:")
+    safe_print("="*50)
     for idx, ev in enumerate(riftbound_matches, 1):
-        print(f"{idx}. {ev['name']}")
-        print(f"   Date: {ev['date']} at {ev['time']}")
-        print(f"   Store: {ev['store_name']} ({ev['distance']:.1f} miles away)")
-        print(f"   Spots: {ev['spots']} | Cost: {ev['cost']}")
-        print("-" * 50)
+        dist_str = f"{ev['distance']:.1f} miles away" if ev['distance'] != 9999.0 else "distance unknown"
+        safe_print(f"{idx}. {ev['name']}")
+        safe_print(f"   Date: {ev['date']} at {ev['time']}")
+        safe_print(f"   Store: {ev['store_name']} ({dist_str})")
+        safe_print(f"   Spots: {ev['spots']} | Cost: {ev['cost']}")
+        safe_print("-" * 50)
         
     # Generate HTML report in the same directory as the script
     script_dir = os.path.dirname(os.path.abspath(__file__))
