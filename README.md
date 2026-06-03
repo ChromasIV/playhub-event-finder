@@ -3,7 +3,7 @@
 A zero-dependency, automated competitive card game event finder. It fetches, filters, and generates a visual dashboard of upcoming **Disney Lorcana Store Championships** and **Riftbound Summoner Skirmishes** within a specified radius of your location.
 
 ## Theme Version
-Theme Version: 1.0.5
+Theme Version: 1.0.6
 
 ---
 
