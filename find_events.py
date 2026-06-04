@@ -74,6 +74,7 @@ def detect_location_from_ip():
 
 def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
     events = []
+    seen_ids = set()
     page = 1
     
     if lat is not None and lon is not None and radius is not None:
@@ -95,7 +96,14 @@ def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
             with urllib.request.urlopen(req) as response:
                 data = json.loads(response.read().decode('utf-8'))
                 results = data.get('results', [])
-                events.extend(results)
+                for item in results:
+                    item_id = item.get('id')
+                    if item_id is not None:
+                        if item_id not in seen_ids:
+                            seen_ids.add(item_id)
+                            events.append(item)
+                    else:
+                        events.append(item)
                 
                 next_val = data.get('next')
                 if next_val:
