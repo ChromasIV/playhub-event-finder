@@ -69,6 +69,26 @@ class TestPlayhubEventFinder(unittest.TestCase):
         self.assertEqual(filtered[0]["lat"], 27.9506)
         self.assertEqual(filtered[0]["lon"], -82.4572)
         
+    def test_filter_and_format_events_timezone(self):
+        raw_events = [
+            {
+                "id": "event-tz",
+                "name": "Disney Lorcana Championship NY Time",
+                "description": "Weekly play championship event",
+                "start_datetime": "2026-06-10T18:00:00Z",
+                "timezone": "America/New_York",
+                "cost_in_cents": 1000,
+                "store": {
+                    "name": "NY Store"
+                }
+            }
+        ]
+        filtered = filter_and_format_events(raw_events, "Lorcana", ["championship"])
+        self.assertEqual(len(filtered), 1)
+        # 18:00 UTC = 14:00 (2:00 PM) EDT in America/New_York (June is daylight saving)
+        self.assertEqual(filtered[0]["date"], "Wednesday, June 10, 2026")
+        self.assertTrue(filtered[0]["time"].startswith("02:00 PM"))
+        
     @patch("os.path.exists")
     def test_load_config_default(self, mock_exists):
         mock_exists.return_value = False

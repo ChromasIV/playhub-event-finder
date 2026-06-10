@@ -155,6 +155,7 @@ def filter_and_format_events(events, game_type, keywords, user_lat=None, user_lo
             event_lon = None
         
         start_str = item.get('start_datetime', '')
+        tz_name = item.get('timezone')
         # Parse start date
         date_formatted = "Unknown Date"
         time_formatted = "Unknown Time"
@@ -166,6 +167,16 @@ def filter_and_format_events(events, game_type, keywords, user_lat=None, user_lo
                     clean_str = clean_str[:-1] + '+00:00'
                 dt = datetime.fromisoformat(clean_str)
                 sort_dt = dt
+                
+                # Convert to local timezone if specified
+                if tz_name:
+                    try:
+                        import zoneinfo
+                        tz = zoneinfo.ZoneInfo(tz_name)
+                        dt = dt.astimezone(tz)
+                    except Exception:
+                        pass
+                
                 date_formatted = dt.strftime("%A, %B %d, %Y")
                 time_formatted = dt.strftime("%I:%M %p %Z").strip()
             except Exception as ex:
