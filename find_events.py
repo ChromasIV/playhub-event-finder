@@ -972,7 +972,11 @@ def main():
     radius = config.get("radius_miles", DEFAULT_RADIUS)
     global_mode = config.get("global_mode", False) or "GITHUB_ACTIONS" in os.environ
     
-    lorcana_keywords = config.get("lorcana_keywords", ["championship", "championset", "champion"])
+    lorcana_keywords = config.get("lorcana_keywords", [
+        "championship", "championset", "champion", "champs", "champ set",
+        "ccq", "qualifier",
+        "challenge", "dlc"
+    ])
     riftbound_keywords = config.get("riftbound_keywords", ["skirmish"])
     
     # 1. Geolocation detection
