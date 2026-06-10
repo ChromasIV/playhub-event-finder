@@ -232,8 +232,8 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
     # Sort events by date initially
     events.sort(key=lambda x: x['sort_dt_iso'])
     
-    # JSON dump for embedding
-    events_json = json.dumps(events, indent=2)
+    # JSON dump for embedding and escaping angle brackets to prevent XSS/Script tag injection in HTML
+    events_json = json.dumps(events, indent=2).replace("<", "\\u003c").replace(">", "\\u003e")
     
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
