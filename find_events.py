@@ -122,6 +122,54 @@ def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
     print(f"Retrieved {len(events)} total upcoming events for {game_slug}.")
     return events
 
+def determine_champset(name, desc, game_type):
+    if game_type != 'Lorcana':
+        return 'Riftbound Skirmish'
+    
+    text = (name + " " + (desc or "")).lower()
+    
+    # Define our sets and keywords to match
+    sets = [
+        ("The First Chapter", ["the first chapter", "first chapter", "tfc", "set 1"]),
+        ("Rise of the Floodborn", ["rise of the floodborn", "floodborn", "rotf", "set 2"]),
+        ("Into the Inklands", ["into the inklands", "inklands", "set 3"]),
+        ("Ursula's Return", ["ursula's return", "ursulas return", "ursula", "set 4"]),
+        ("Shimmering Skies", ["shimmering skies", "shimmering", "set 5"]),
+        ("Azurite Sea", ["azurite sea", "azurite", "set 6"]),
+        ("Archazia's Island", ["archazia's island", "archazias island", "archazia", "set 7"]),
+        ("Reign of Jafar", ["reign of jafar", "jafar", "set 8"]),
+        ("Fabled", ["fabled", "set 9"]),
+        ("Whispers in the Well", ["whispers in the well", "whispers", "set 10"]),
+        ("Winterspell", ["winterspell", "set 11"]),
+        ("Wilds Unknown", ["wilds unknown", "set 12"])
+    ]
+    
+    for set_name, keywords in sets:
+        for kw in keywords:
+            if kw in text:
+                return set_name
+                
+    return "General / Unspecified Set"
+
+def determine_champset_rank(champset):
+    ranks = {
+        "The First Chapter": 1,
+        "Rise of the Floodborn": 2,
+        "Into the Inklands": 3,
+        "Ursula's Return": 4,
+        "Shimmering Skies": 5,
+        "Azurite Sea": 6,
+        "Archazia's Island": 7,
+        "Reign of Jafar": 8,
+        "Fabled": 9,
+        "Whispers in the Well": 10,
+        "Winterspell": 11,
+        "Wilds Unknown": 12,
+        "General / Unspecified Set": 98,
+        "Riftbound Skirmish": 99
+    }
+    return ranks.get(champset, 99)
+
 def filter_and_format_events(events, game_type, keywords, user_lat=None, user_lon=None):
     filtered = []
     for item in events:
@@ -203,6 +251,9 @@ def filter_and_format_events(events, game_type, keywords, user_lat=None, user_lo
         else:
             dist = item.get('distance_in_miles') or 9999.0
         
+        champset = determine_champset(name, desc, game_type)
+        champset_rank = determine_champset_rank(champset)
+        
         filtered.append({
             'id': event_id,
             'name': name,
@@ -221,7 +272,9 @@ def filter_and_format_events(events, game_type, keywords, user_lat=None, user_lo
             'distance': dist,
             'lat': event_lat,
             'lon': event_lon,
-            'url': reg_url
+            'url': reg_url,
+            'champset': champset,
+            'champset_rank': champset_rank
         })
         
     return filtered
@@ -479,6 +532,12 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             border: 1px solid rgba(59, 130, 246, 0.2);
         }}
         
+        .badge.champset-bg {{
+            background: rgba(168, 85, 247, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(168, 85, 247, 0.2);
+        }}
+        
         .card-list {{
             display: flex;
             flex-direction: column;
@@ -675,6 +734,38 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                         <option value="60">Next 60 Days</option>
                     </select>
                 </div>
+
+                <!-- Client-side champset filter -->
+                <div class="filter-group" style="flex: 1; min-width: 200px;">
+                    <label for="champset-filter">Champset / Category</label>
+                    <select id="champset-filter" style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 0.95rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-riftbound)'" onblur="this.style.borderColor='var(--border-color)'">
+                        <option value="all">All Sets / Categories</option>
+                        <option value="The First Chapter">The First Chapter</option>
+                        <option value="Rise of the Floodborn">Rise of the Floodborn</option>
+                        <option value="Into the Inklands">Into the Inklands</option>
+                        <option value="Ursula&#39;s Return">Ursula&#39;s Return</option>
+                        <option value="Shimmering Skies">Shimmering Skies</option>
+                        <option value="Azurite Sea">Azurite Sea</option>
+                        <option value="Archazia&#39;s Island">Archazia&#39;s Island</option>
+                        <option value="Reign of Jafar">Reign of Jafar</option>
+                        <option value="Fabled">Fabled</option>
+                        <option value="Whispers in the Well">Whispers in the Well</option>
+                        <option value="Winterspell">Winterspell</option>
+                        <option value="Wilds Unknown">Wilds Unknown</option>
+                        <option value="General / Unspecified Set">General / Unspecified Set</option>
+                        <option value="Riftbound Skirmish">Riftbound Skirmish</option>
+                    </select>
+                </div>
+
+                <!-- Client-side sort by filter -->
+                <div class="filter-group" style="flex: 1; min-width: 200px;">
+                    <label for="sort-by">Sort By</label>
+                    <select id="sort-by" style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 0.95rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-riftbound)'" onblur="this.style.borderColor='var(--border-color)'">
+                        <option value="date">Date (Earliest First)</option>
+                        <option value="distance">Distance (Closest First)</option>
+                        <option value="champset">Champset (Release Order)</option>
+                    </select>
+                </div>
                 
                 <!-- Toggles for games -->
                 <div class="filter-group" style="flex: 0 0 auto;">
@@ -727,11 +818,15 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         let currentLat = {lat};
         let currentLon = {lon};
         let maxDays = "all";
+        let selectedChampset = "all";
+        let sortBy = "date";
         
         const searchInput = document.getElementById("search-input");
         const distanceSlider = document.getElementById("distance-slider");
         const distanceDisplay = document.getElementById("distance-display");
         const dateFilter = document.getElementById("date-filter");
+        const champsetFilter = document.getElementById("champset-filter");
+        const sortBySelect = document.getElementById("sort-by");
         const toggleLorcanaBtn = document.getElementById("toggle-lorcana");
         const toggleRiftboundBtn = document.getElementById("toggle-riftbound");
         
@@ -826,6 +921,9 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                     if (diffDays > parseInt(maxDays)) return false;
                 }}
                 
+                // Champset check
+                if (selectedChampset !== "all" && ev.champset !== selectedChampset) return false;
+                
                 // Search query check
                 if (searchQuery) {{
                     const q = searchQuery.toLowerCase();
@@ -833,19 +931,40 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                     const storeMatch = ev.store_name.toLowerCase().includes(q);
                     const addressMatch = ev.store_address.toLowerCase().includes(q);
                     const descMatch = (ev.description || "").toLowerCase().includes(q);
-                    if (!nameMatch && !storeMatch && !addressMatch && !descMatch) return false;
+                    const champsetMatch = (ev.champset || "").toLowerCase().includes(q);
+                    if (!nameMatch && !storeMatch && !addressMatch && !descMatch && !champsetMatch) return false;
                 }}
                 
                 return true;
             }});
             
-            // Separate lists and sort by date ASC (earliest first)
+            // Separate lists and sort
             const lorcanaList = filtered.filter(ev => ev.game_type === "Lorcana").sort((a, b) => {{
+                if (sortBy === "champset") {{
+                    if (a.champset_rank !== b.champset_rank) {{
+                        return a.champset_rank - b.champset_rank;
+                    }}
+                }} else if (sortBy === "distance") {{
+                    if (a.distance !== b.distance) {{
+                        return a.distance - b.distance;
+                    }}
+                }}
+                // Default to date ASC (earliest first)
                 if (!a.sort_dt_iso) return 1;
                 if (!b.sort_dt_iso) return -1;
                 return a.sort_dt_iso.localeCompare(b.sort_dt_iso);
             }});
             const riftboundList = filtered.filter(ev => ev.game_type === "Riftbound").sort((a, b) => {{
+                if (sortBy === "champset") {{
+                    if (a.champset_rank !== b.champset_rank) {{
+                        return a.champset_rank - b.champset_rank;
+                    }}
+                }} else if (sortBy === "distance") {{
+                    if (a.distance !== b.distance) {{
+                        return a.distance - b.distance;
+                    }}
+                }}
+                // Default to date ASC (earliest first)
                 if (!a.sort_dt_iso) return 1;
                 if (!b.sort_dt_iso) return -1;
                 return a.sort_dt_iso.localeCompare(b.sort_dt_iso);
@@ -872,6 +991,13 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         
         function generateEventCard(ev, styleClass) {{
             const distStr = ev.distance !== 9999 ? `${{ev.distance.toFixed(1)}} mi` : "Unknown dist";
+            const badgeHtml = ev.game_type === "Lorcana" 
+                ? `<div style="margin-top: 6px; margin-bottom: 12px;">
+                       <span class="badge champset-bg">${{ev.champset}}</span>
+                   </div>`
+                : `<div style="margin-top: 6px; margin-bottom: 12px;">
+                       <span class="badge riftbound-bg">${{ev.champset}}</span>
+                   </div>`;
             return `
                 <div class="event-card ${{styleClass}}-card">
                     <div>
@@ -879,6 +1005,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                             <h3 class="event-name">${{ev.name}}</h3>
                             <span class="event-distance">${{distStr}}</span>
                         </div>
+                        ${{badgeHtml}}
                         <div class="event-details">
                             <div class="detail-row">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
@@ -923,6 +1050,16 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         
         dateFilter.addEventListener("change", (e) => {{
             maxDays = e.target.value;
+            renderEvents();
+        }});
+        
+        champsetFilter.addEventListener("change", (e) => {{
+            selectedChampset = e.target.value;
+            renderEvents();
+        }});
+        
+        sortBySelect.addEventListener("change", (e) => {{
+            sortBy = e.target.value;
             renderEvents();
         }});
         

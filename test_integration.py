@@ -105,6 +105,32 @@ async def run_test():
         assert lorcana_tampa_text == lorcana_tampa_baseline, f"Lorcana counts did not restore! {lorcana_tampa_text} vs {lorcana_tampa_baseline}"
         assert riftbound_tampa_text == riftbound_tampa_baseline, f"Riftbound counts did not restore! {riftbound_tampa_text} vs {riftbound_tampa_baseline}"
         
+        # 5. Test Champset/Category Filter
+        print("Testing Champset Filter...")
+        first_event_set = await page.locator(".champset-bg").first.text_content()
+        first_event_set = first_event_set.strip()
+        print(f"Filtering by set found on first card: '{first_event_set}'")
+        await page.select_option("#champset-filter", first_event_set)
+        await page.wait_for_timeout(500)
+        
+        lorcana_champset_text = await page.locator("#lorcana-count").text_content()
+        print(f"Filtered counts for '{first_event_set}': Lorcana={lorcana_champset_text}")
+        assert "0 Found" not in lorcana_champset_text, f"Expected some events to match '{first_event_set}' but got {lorcana_champset_text}"
+        
+        # Reset champset filter to all
+        await page.select_option("#champset-filter", "all")
+        await page.wait_for_timeout(500)
+        
+        # 6. Test Sort By Filter
+        print("Testing Sort By dropdown...")
+        await page.select_option("#sort-by", "champset")
+        await page.wait_for_timeout(500)
+        
+        # Verify first event card has a valid badge
+        first_badge = await page.locator(".champset-bg").first.text_content()
+        print(f"First Lorcana event sorted champset badge: {first_badge}")
+        assert len(first_badge) > 0, "No badge text found for sorted events"
+        
         print("All automated integration tests passed successfully!")
         await browser.close()
 

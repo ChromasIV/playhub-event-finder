@@ -4,7 +4,7 @@ from datetime import datetime
 from unittest.mock import patch, mock_open
 
 # Import functions from find_events
-from find_events import haversine, filter_and_format_events, load_config
+from find_events import haversine, filter_and_format_events, load_config, determine_champset, determine_champset_rank
 
 class TestPlayhubEventFinder(unittest.TestCase):
     
@@ -68,6 +68,8 @@ class TestPlayhubEventFinder(unittest.TestCase):
         self.assertEqual(filtered[0]["distance"], 0.0)
         self.assertEqual(filtered[0]["lat"], 27.9506)
         self.assertEqual(filtered[0]["lon"], -82.4572)
+        self.assertEqual(filtered[0]["champset"], "General / Unspecified Set")
+        self.assertEqual(filtered[0]["champset_rank"], 98)
         
     def test_filter_and_format_events_timezone(self):
         raw_events = [
@@ -89,6 +91,24 @@ class TestPlayhubEventFinder(unittest.TestCase):
         self.assertEqual(filtered[0]["date"], "Wednesday, June 10, 2026")
         self.assertTrue(filtered[0]["time"].startswith("02:00 PM"))
         
+    def test_determine_champset(self):
+        # Lorcana matches
+        self.assertEqual(determine_champset("Into the Inklands Store Championship", "", "Lorcana"), "Into the Inklands")
+        self.assertEqual(determine_champset("Lorcana Set Champs", "This is an Azurite Sea event", "Lorcana"), "Azurite Sea")
+        self.assertEqual(determine_champset("Disney Lorcana Ursula's Return Championship", "", "Lorcana"), "Ursula's Return")
+        self.assertEqual(determine_champset("Lorcana Store Championship", "set championship for rise of the floodborn", "Lorcana"), "Rise of the Floodborn")
+        self.assertEqual(determine_champset("Lorcana Store Championship", "weekly competitive play", "Lorcana"), "General / Unspecified Set")
+        
+        # Non-Lorcana matches
+        self.assertEqual(determine_champset("Riftbound Skirmish", "", "Riftbound"), "Riftbound Skirmish")
+        
+    def test_determine_champset_rank(self):
+        self.assertEqual(determine_champset_rank("The First Chapter"), 1)
+        self.assertEqual(determine_champset_rank("Into the Inklands"), 3)
+        self.assertEqual(determine_champset_rank("Azurite Sea"), 6)
+        self.assertEqual(determine_champset_rank("General / Unspecified Set"), 98)
+        self.assertEqual(determine_champset_rank("Riftbound Skirmish"), 99)
+
     @patch("os.path.exists")
     def test_load_config_default(self, mock_exists):
         mock_exists.return_value = False
