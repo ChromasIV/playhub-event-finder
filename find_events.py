@@ -901,6 +901,15 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             }}
         }}
         
+        // Helper to normalize text for fuzzy, spelling-tolerant matching
+        function normalizeText(text) {{
+            if (!text) return "";
+            return text.toLowerCase()
+                       .replace(/[^a-z0-9]/g, "")
+                       .replace(/z/g, "s")
+                       .replace(/s+/g, "s");
+        }}
+
         // Render events client-side based on active filters
         function renderEvents() {{
             // Filter elements
@@ -910,11 +919,11 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 if (ev.game_type === "Lorcana" && !showLorcana) return false;
                 if (ev.game_type === "Riftbound" && !showRiftbound) return false;
                 
-                // Distance check
-                if (ev.distance > maxDistance) return false;
+                // Distance check (bypassed if there is an active search query)
+                if (!searchQuery && ev.distance > maxDistance) return false;
                 
-                // Date range check
-                if (maxDays !== "all" && ev.sort_dt_iso) {{
+                // Date range check (bypassed if there is an active search query)
+                if (!searchQuery && maxDays !== "all" && ev.sort_dt_iso) {{
                     const eventDate = new Date(ev.sort_dt_iso);
                     const diffTime = eventDate - now;
                     const diffDays = diffTime / (1000 * 60 * 60 * 24);
@@ -924,14 +933,14 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 // Champset check
                 if (selectedChampset !== "all" && ev.champset !== selectedChampset) return false;
                 
-                // Search query check
+                // Search query check (fuzzy, spelling-tolerant match)
                 if (searchQuery) {{
-                    const q = searchQuery.toLowerCase();
-                    const nameMatch = ev.name.toLowerCase().includes(q);
-                    const storeMatch = ev.store_name.toLowerCase().includes(q);
-                    const addressMatch = ev.store_address.toLowerCase().includes(q);
-                    const descMatch = (ev.description || "").toLowerCase().includes(q);
-                    const champsetMatch = (ev.champset || "").toLowerCase().includes(q);
+                    const q = normalizeText(searchQuery);
+                    const nameMatch = normalizeText(ev.name).includes(q);
+                    const storeMatch = normalizeText(ev.store_name).includes(q);
+                    const addressMatch = normalizeText(ev.store_address).includes(q);
+                    const descMatch = normalizeText(ev.description).includes(q);
+                    const champsetMatch = normalizeText(ev.champset).includes(q);
                     if (!nameMatch && !storeMatch && !addressMatch && !descMatch && !champsetMatch) return false;
                 }}
                 
