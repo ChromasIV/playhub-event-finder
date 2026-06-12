@@ -72,7 +72,7 @@ def detect_location_from_ip():
         'region': "Florida"
     }
 
-def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
+def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None, filter_keywords=None):
     events = []
     seen_ids = set()
     page = 1
@@ -88,15 +88,28 @@ def get_events(game_slug, lat=None, lon=None, radius=None, keyword=None):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
     print(f"Fetching {game_slug} events (URL: {url})...")
-    max_pages = 15 if game_slug == "disney-lorcana" else 40
+    max_pages = 100 if game_slug == "disney-lorcana" else 40
     
     while url and page <= max_pages:
         try:
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 data = json.loads(response.read().decode('utf-8'))
                 results = data.get('results', [])
                 for item in results:
+                    if filter_keywords:
+                        name = item.get('name', '') or ''
+                        desc = item.get('description', '') or ''
+                        name_lower = name.lower()
+                        desc_lower = desc.lower()
+                        matches_filter = False
+                        for kw in filter_keywords:
+                            if kw.lower() in name_lower or kw.lower() in desc_lower:
+                                matches_filter = True
+                                break
+                        if not matches_filter:
+                            continue
+
                     item_id = item.get('id')
                     if item_id is not None:
                         if item_id not in seen_ids:
@@ -708,6 +721,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                     <div style="display: flex; gap: 8px;">
                         <input type="text" id="location-input" placeholder="City, State, Zip or Country..." style="flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 0.95rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-riftbound)'" onblur="this.style.borderColor='var(--border-color)'">
                         <button id="location-search-btn" style="background: var(--gradient-riftbound); border: none; border-radius: 10px; color: #ffffff; padding: 0 20px; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">Search</button>
+                        <button id="location-detect-btn" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; color: #ffffff; padding: 0 15px; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 6px;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">📍 Locate</button>
                     </div>
                     <div id="location-status" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; font-family: 'Inter', sans-serif;"></div>
                 </div>
@@ -832,6 +846,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         
         const locationInput = document.getElementById("location-input");
         const locationSearchBtn = document.getElementById("location-search-btn");
+        const locationDetectBtn = document.getElementById("location-detect-btn");
         const locationStatus = document.getElementById("location-status");
         const centerDisplayName = document.getElementById("center-display-name");
         const centerLatSpan = document.getElementById("center-lat");
@@ -1084,6 +1099,124 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             renderEvents();
         }});
         
+        // Detect location using browser Geolocation or IP fallback
+        function requestUserLocation() {{
+            if (!navigator.geolocation) {{
+                locationStatus.textContent = "❌ Geolocation not supported. Querying IP location...";
+                locationStatus.style.color = "#f87171";
+                queryIPLocation();
+                return;
+            }}
+            
+            locationStatus.textContent = "📍 Requesting browser location...";
+            locationStatus.style.color = "var(--text-muted)";
+            locationDetectBtn.innerHTML = "⏳ Locating...";
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {{
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    currentLat = lat;
+                    currentLon = lon;
+                    
+                    centerLatSpan.textContent = lat.toFixed(4);
+                    centerLonSpan.textContent = lon.toFixed(4);
+                    locationStatus.textContent = "📍 Resolving address details...";
+                    
+                    fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lon, {{
+                        headers: {{ 'Accept-Language': 'en' }}
+                    }})
+                    .then(res => res.json())
+                    .then(data => {{
+                        const addr = data.address || {{}};
+                        const city = addr.city || addr.town || addr.village || addr.suburb || addr.hamlet || '';
+                        const state = addr.state || addr.region || '';
+                        var name = city;
+                        if (state) {{
+                            name += ", " + state;
+                        }}
+                        if (!name) {{
+                            name = data.display_name ? data.display_name.split(',')[0] : "Near you";
+                        }}
+                        
+                        centerDisplayName.textContent = name;
+                        locationStatus.textContent = "✅ Location updated successfully!";
+                        locationStatus.style.color = "#34d399";
+                        locationDetectBtn.innerHTML = "📍 Locate";
+                        
+                        // Recalculate distances for all events
+                        ALL_EVENTS.forEach(ev => {{
+                            ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
+                        }});
+                        renderEvents();
+                    }})
+                    .catch(err => {{
+                        console.warn("Reverse geocoding failed:", err);
+                        centerDisplayName.textContent = "Near you (" + lat.toFixed(4) + ", " + lon.toFixed(4) + ")";
+                        locationStatus.textContent = "✅ Location updated successfully!";
+                        locationStatus.style.color = "#34d399";
+                        locationDetectBtn.innerHTML = "📍 Locate";
+                        
+                        ALL_EVENTS.forEach(ev => {{
+                            ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
+                        }});
+                        renderEvents();
+                    }});
+                }},
+                (error) => {{
+                    console.warn("Geolocation failed or denied. Geolocating via IP fallback...");
+                    queryIPLocation();
+                }}
+            );
+        }}
+        
+        function queryIPLocation() {{
+            locationStatus.textContent = "📍 Querying IP location database...";
+            locationStatus.style.color = "var(--text-muted)";
+            locationDetectBtn.innerHTML = "⏳ Locating...";
+            
+            fetch("https://ipapi.co/json/")
+            .then(res => res.json())
+            .then(data => {{
+                if (data && data.latitude && data.longitude) {{
+                    currentLat = data.latitude;
+                    currentLon = data.longitude;
+                    
+                    centerLatSpan.textContent = currentLat.toFixed(4);
+                    centerLonSpan.textContent = currentLon.toFixed(4);
+                    
+                    var name = data.city || 'your region';
+                    if (data.region) {{
+                        name += ", " + data.region;
+                    }}
+                    name += " (via IP)";
+                    
+                    centerDisplayName.textContent = name;
+                    locationStatus.textContent = "✅ Location updated successfully!";
+                    locationStatus.style.color = "#34d399";
+                    
+                    ALL_EVENTS.forEach(ev => {{
+                        ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
+                    }});
+                    renderEvents();
+                }} else {{
+                    locationStatus.textContent = "❌ Could not locate. Using default location.";
+                    locationStatus.style.color = "#f87171";
+                }}
+                locationDetectBtn.innerHTML = "📍 Locate";
+            }})
+            .catch(err => {{
+                console.error("IP geolocation error:", err);
+                locationStatus.textContent = "❌ Error querying IP location.";
+                locationStatus.style.color = "#f87171";
+                locationDetectBtn.innerHTML = "📍 Locate";
+            }});
+        }}
+
+        locationDetectBtn.addEventListener("click", () => {{
+            requestUserLocation();
+        }});
+        
         locationInput.addEventListener("keypress", (e) => {{
             if (e.key === "Enter") {{
                 geocodeAddress(locationInput.value);
@@ -1156,14 +1289,9 @@ def main():
             print("Invalid arguments. Usage: python find_events.py [latitude] [longitude] [radius_miles]")
             sys.exit(1)
             
-    if global_mode:
-        print(f"Searching events globally. Initial center set to: {location_name} ({lat}, {lon})")
-        lorcana_raw = get_events("disney-lorcana", keyword="champion")
-        riftbound_raw = get_events("riftbound", keyword="skirmish")
-    else:
-        print(f"Searching events within {radius} miles of coordinates ({lat}, {lon}) ({location_name})")
-        lorcana_raw = get_events("disney-lorcana", lat, lon, radius)
-        riftbound_raw = get_events("riftbound", lat, lon, radius)
+    print(f"Searching events globally. Initial center set to: {location_name} ({lat}, {lon})")
+    lorcana_raw = get_events("disney-lorcana", filter_keywords=lorcana_keywords)
+    riftbound_raw = get_events("riftbound", filter_keywords=riftbound_keywords)
         
     lorcana_matches = filter_and_format_events(lorcana_raw, "Lorcana", lorcana_keywords, user_lat=lat, user_lon=lon)
     riftbound_matches = filter_and_format_events(riftbound_raw, "Riftbound", riftbound_keywords, user_lat=lat, user_lon=lon)
