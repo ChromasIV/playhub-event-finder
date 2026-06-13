@@ -692,6 +692,32 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         .btn-register:hover {{
             opacity: 0.9;
         }}
+        
+        .btn-load-more {{
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: #ffffff;
+            padding: 12px 24px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }}
+        
+        .btn-load-more:hover {{
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }}
+        
+        .btn-load-more:active {{
+            transform: scale(0.98);
+        }}
     </style>
 </head>
 <body>
@@ -806,6 +832,9 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 <div class="card-list" id="lorcana-container">
                     <!-- Cards will be populated dynamically -->
                 </div>
+                <div id="lorcana-load-more-container" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+                    <!-- Load More Button will be populated dynamically -->
+                </div>
             </div>
             
             <!-- RIFTBOUND SECTION -->
@@ -816,6 +845,9 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                 </div>
                 <div class="card-list" id="riftbound-container">
                     <!-- Cards will be populated dynamically -->
+                </div>
+                <div id="riftbound-load-more-container" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
+                    <!-- Load More Button will be populated dynamically -->
                 </div>
             </div>
         </div>
@@ -834,6 +866,14 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         let maxDays = "all";
         let selectedChampset = "all";
         let sortBy = "date";
+        
+        let limitLorcana = 20;
+        let limitRiftbound = 20;
+        
+        function resetLimits() {{
+            limitLorcana = 20;
+            limitRiftbound = 20;
+        }}
         
         const searchInput = document.getElementById("search-input");
         const distanceSlider = document.getElementById("distance-slider");
@@ -903,7 +943,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                     ALL_EVENTS.forEach(ev => {{
                         ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
                     }});
-                    
+                    resetLimits();
                     renderEvents();
                 }} else {{
                     locationStatus.textContent = "❌ Location not found. Try adding city/state.";
@@ -1002,15 +1042,47 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
             lorcanaCount.textContent = `${{lorcanaList.length}} Found`;
             riftboundCount.textContent = `${{riftboundList.length}} Found`;
             
-            // Render Lorcana
+            // Render Lorcana (sliced with load more option)
+            const visibleLorcanaList = lorcanaList.slice(0, limitLorcana);
             lorcanaContainer.innerHTML = lorcanaList.length === 0 
                 ? `<div class="no-events">No matching Lorcana events within range.</div>`
-                : lorcanaList.map(ev => generateEventCard(ev, "lorcana")).join("");
+                : visibleLorcanaList.map(ev => generateEventCard(ev, "lorcana")).join("");
                 
-            // Render Riftbound
+            const lorcanaLoadMoreContainer = document.getElementById("lorcana-load-more-container");
+            if (lorcanaList.length > limitLorcana) {{
+                lorcanaLoadMoreContainer.innerHTML = `
+                    <button class="btn-load-more" id="btn-load-more-lorcana">
+                        Load More Lorcana (${{lorcanaList.length - limitLorcana}} remaining)
+                    </button>
+                `;
+                document.getElementById("btn-load-more-lorcana").addEventListener("click", () => {{
+                    limitLorcana += 20;
+                    renderEvents();
+                }});
+            }} else {{
+                lorcanaLoadMoreContainer.innerHTML = "";
+            }}
+                
+            // Render Riftbound (sliced with load more option)
+            const visibleRiftboundList = riftboundList.slice(0, limitRiftbound);
             riftboundContainer.innerHTML = riftboundList.length === 0 
                 ? `<div class="no-events">No matching Riftbound skirmishes within range.</div>`
-                : riftboundList.map(ev => generateEventCard(ev, "riftbound")).join("");
+                : visibleRiftboundList.map(ev => generateEventCard(ev, "riftbound")).join("");
+                
+            const riftboundLoadMoreContainer = document.getElementById("riftbound-load-more-container");
+            if (riftboundList.length > limitRiftbound) {{
+                riftboundLoadMoreContainer.innerHTML = `
+                    <button class="btn-load-more" id="btn-load-more-riftbound">
+                        Load More Riftbound (${{riftboundList.length - limitRiftbound}} remaining)
+                    </button>
+                `;
+                document.getElementById("btn-load-more-riftbound").addEventListener("click", () => {{
+                    limitRiftbound += 20;
+                    renderEvents();
+                }});
+            }} else {{
+                riftboundLoadMoreContainer.innerHTML = "";
+            }}
         }}
         
         function generateEventCard(ev, styleClass) {{
@@ -1063,39 +1135,46 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
         // Listeners
         searchInput.addEventListener("input", (e) => {{
             searchQuery = e.target.value;
+            resetLimits();
             renderEvents();
         }});
         
         distanceSlider.addEventListener("input", (e) => {{
             maxDistance = Number(e.target.value);
             distanceDisplay.textContent = `${{maxDistance}} mi`;
+            resetLimits();
             renderEvents();
         }});
         
         dateFilter.addEventListener("change", (e) => {{
             maxDays = e.target.value;
+            resetLimits();
             renderEvents();
         }});
         
         champsetFilter.addEventListener("change", (e) => {{
             selectedChampset = e.target.value;
+            resetLimits();
             renderEvents();
         }});
         
         sortBySelect.addEventListener("change", (e) => {{
             sortBy = e.target.value;
+            resetLimits();
             renderEvents();
         }});
         
         toggleLorcanaBtn.addEventListener("click", () => {{
             showLorcana = !showLorcana;
             toggleLorcanaBtn.classList.toggle("active", showLorcana);
+            resetLimits();
             renderEvents();
         }});
         
         toggleRiftboundBtn.addEventListener("click", () => {{
             showRiftbound = !showRiftbound;
             toggleRiftboundBtn.classList.toggle("active", showRiftbound);
+            resetLimits();
             renderEvents();
         }});
         
@@ -1148,6 +1227,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                         ALL_EVENTS.forEach(ev => {{
                             ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
                         }});
+                        resetLimits();
                         renderEvents();
                     }})
                     .catch(err => {{
@@ -1160,6 +1240,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                         ALL_EVENTS.forEach(ev => {{
                             ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
                         }});
+                        resetLimits();
                         renderEvents();
                     }});
                 }},
@@ -1198,6 +1279,7 @@ def generate_html_report(events, lat, lon, radius, location_name, output_file):
                     ALL_EVENTS.forEach(ev => {{
                         ev.distance = calculateHaversine(currentLat, currentLon, ev.lat, ev.lon);
                     }});
+                    resetLimits();
                     renderEvents();
                 }} else {{
                     locationStatus.textContent = "❌ Could not locate. Using default location.";
