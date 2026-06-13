@@ -1289,9 +1289,14 @@ def main():
             print("Invalid arguments. Usage: python find_events.py [latitude] [longitude] [radius_miles]")
             sys.exit(1)
             
-    print(f"Searching events globally. Initial center set to: {location_name} ({lat}, {lon})")
-    lorcana_raw = get_events("disney-lorcana", filter_keywords=lorcana_keywords)
-    riftbound_raw = get_events("riftbound", filter_keywords=riftbound_keywords)
+    if global_mode:
+        print(f"Searching events globally. Initial center set to: {location_name} ({lat}, {lon})")
+        lorcana_raw = get_events("disney-lorcana", keyword="champion", filter_keywords=lorcana_keywords)
+        riftbound_raw = get_events("riftbound", keyword="skirmish", filter_keywords=riftbound_keywords)
+    else:
+        print(f"Searching events within {radius} miles of coordinates ({lat}, {lon}) ({location_name})")
+        lorcana_raw = get_events("disney-lorcana", lat=lat, lon=lon, radius=radius, filter_keywords=lorcana_keywords)
+        riftbound_raw = get_events("riftbound", lat=lat, lon=lon, radius=radius, filter_keywords=riftbound_keywords)
         
     lorcana_matches = filter_and_format_events(lorcana_raw, "Lorcana", lorcana_keywords, user_lat=lat, user_lon=lon)
     riftbound_matches = filter_and_format_events(riftbound_raw, "Riftbound", riftbound_keywords, user_lat=lat, user_lon=lon)
